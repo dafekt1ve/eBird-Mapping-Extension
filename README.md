@@ -3,6 +3,7 @@
 **Chrome Installation instructions**
 
 **To load an unpacked extension in developer mode:**
+  
   1a. Go to the Extensions page by entering "chrome://extensions" in a new tab. (By design chrome:// URLs are not linkable.)
   
   1b. Alternatively, click the Extensions menu puzzle button and select Manage Extensions at the bottom of the menu.
