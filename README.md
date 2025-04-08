@@ -6,7 +6,7 @@
   1b. Alternatively, click the Extensions menu puzzle button and select Manage Extensions at the bottom of the menu.
   1c. Or, click the Chrome menu, hover over More Tools, then select Extensions.
   
-  2. Enable Developer Mode by clicking the toggle switch next to Developer mode.
+  2. Enable Developer Mode by clicking the toggle switch next to Developer mode in the top-right.
   3. Click the Load unpacked button and select the extension directory.
 
 **Firefox Installation instructions**
