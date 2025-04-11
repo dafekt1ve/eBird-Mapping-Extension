@@ -8,13 +8,14 @@
       "default_title": "Map Sightings"
     },
     "background": {
-      "scripts": ["background.js"]
+      "service_worker": "background.js"
     },
     "web_accessible_resources": [
       {
         "resources": [
           "leaflet/leaflet.js",
           "leaflet/leaflet.css",
+          "d3/d3.v7.min.js",
           "map.js"
         ],
         "matches": ["<all_urls>"]
@@ -26,5 +27,4 @@
     "content_security_policy": {
       "extension_pages": "script-src 'self'; object-src 'self';"
     }
-  }
-  
+  }  

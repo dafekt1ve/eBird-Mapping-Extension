@@ -1,176 +1,132 @@
 (function () {
-  if (!window.L) {
-    console.warn('Leaflet not available.');
+  if (!window.L || !window.d3) {
+    console.warn('Leaflet or D3 not available.');
     return;
   }
 
-  const existingMapContainer = document.getElementById('ebird-map-container');
-  if (existingMapContainer) {
-    // If the map already exists, remove the old one and refresh
-    existingMapContainer.remove();
-  }
+  const existing = document.getElementById('ebird-map-container');
+  if (existing) existing.remove();
 
-  const mapContainer = document.createElement('div');
-  mapContainer.id = 'ebird-map-container';
-  mapContainer.style.margin = '2rem 0';
-  mapContainer.innerHTML = `
-    <h2 style="margin-bottom: 0.5rem;">Sightings Map</h2>
+  const container = document.createElement('div');
+  container.id = 'ebird-map-container';
+  container.style.margin = '2rem 0';
+  container.innerHTML = `
+    <h2>Sightings Map</h2>
     <div id="ebird-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px;"></div>
   `;
+  const content = document.querySelector('#content');
+  content?.parentNode?.insertBefore(container, content.nextSibling);
 
-  const contentDiv = document.querySelector('#content');
-  if (contentDiv && contentDiv.parentNode) {
-    contentDiv.parentNode.insertBefore(mapContainer, contentDiv.nextSibling);
-  }
+  const sightings = [];
+  document.querySelectorAll('.Observation').forEach(entry => {
+    const speciesElement = entry.querySelector('span.Heading-main');
+    const checklistLink = entry.querySelector('a[title="Checklist"]')?.href;
+    const metaText = entry.querySelector('.Observation-meta')?.textContent.trim() || '';
+    const dateTimeText = entry.querySelector('a[title="Checklist"]')?.textContent;
 
-  // Function to extract sightings data
-  function extractSightings() {
-    const sightings = [];
-    const speciesElements = document.querySelectorAll('.Observation');
-    
-    speciesElements.forEach(entry => {
-      const speciesNameElement = entry.querySelector('span.Heading-main'); // ✔️ Species
-      const checklistLink = entry.querySelector('a[title="Checklist"]')?.href; // ✔️ Checklist
-      const dateTimeText = entry.querySelector('a[title="Checklist"]')?.textContent;
-    
-      const locationLink = entry.querySelector('a[href*="www.google.com/maps/search/"]'); // ✔️ Map link
-      const locationName = locationLink?.innerText.trim();
-      const locationUrl = locationLink?.href;
-    
-      // Extract lat/lng from query=39.7392,-104.9903
-      let lat = null, lng = null;
-      if (locationUrl && locationUrl.includes('query=')) {
-        const latlng = locationUrl.split('query=')[1].split(',');
-        lat = parseFloat(latlng[0]);
-        lng = parseFloat(latlng[1]);
-      }
-    
-      if (speciesNameElement && locationName && !isNaN(lat) && !isNaN(lng) && checklistLink) {
-        sightings.push({
-          species: speciesNameElement.textContent.trim(),
-          locationName,
-          lat,
-          lng,
-          checklistUrl: checklistLink,
-          dateTime: dateTimeText || ''
-        });
-      }
-    });
-    
-    console.log('Sightings:', sightings);  // Debugging line to check the parsed sightings data
-    return sightings;
-  }
+    const locationLink = entry.querySelector('a[href*="www.google.com/maps/search/"]');
+    const locationName = locationLink?.innerText.trim();
+    const locationUrl = locationLink?.href;
+    if (!locationUrl) return;
 
-    const sightings = extractSightings();
+    const latlng = locationUrl.split('query=')[1]?.split(',');
+    const lat = parseFloat(latlng?.[0]);
+    const lng = parseFloat(latlng?.[1]);
 
-    if (sightings.length === 0) {
-      console.warn('No sightings found. Ensure the selectors are correct and the page is fully loaded.');
-      return;
-    }
-
-    const locationMap = new Map();
-
-    sightings.forEach(({ species, locationName, lat, lng, checklistUrl, dateTime }) => {
-      const key = `${lat},${lng}`;
-      if (!locationMap.has(key)) {
-        locationMap.set(key, {
-          lat,
-          lng,
-          locationName,
-          speciesList: new Map()  // species → { url, dateTime }
-        });
-      }
-    
-      const loc = locationMap.get(key);
-      if (!loc.speciesList.has(species)) {
-        loc.speciesList.set(species, { url: checklistUrl, dateTime });
-      }
-    });    
-    
-
-    console.log('Location Map:', locationMap);  // Debugging line to check the processed locations and species counts
-
-    const map = L.map('ebird-map');
-    const markers = [];
-
-    function getColor(count) {
-      if (count > 20) return 'red';
-      if (count > 15) return 'orange';
-      if (count > 10) return 'yellow';
-      if (count > 5) return 'green';
-      if (count > 2) return 'blue';
-      return 'white';
-    }
-
-    // Convert Map to array and sort by species count ASCENDING
-    const sortedLocations = Array.from(locationMap.values()).sort((a, b) => 
-        a.speciesList.size - b.speciesList.size
-    );
-    
-    sortedLocations.forEach(loc => {
-      const speciesCount = loc.speciesList.size;
-      const color = getColor(speciesCount);
-    
-      const marker = L.circleMarker([loc.lat, loc.lng], {
-        radius: 10,
-        fillColor: color,
-        color: '#333',
-        weight: 1,
-        fillOpacity: 0.8
-      }).bindPopup(
-        `<strong>${loc.locationName}</strong><br>${speciesCount} species:<br>` +
-        [...loc.speciesList.entries()].map(([species, { url, dateTime }]) =>
-          `&bull; ${species}` +
-          (dateTime ? ` <small>(<a href="${url}" target="_blank">${dateTime}</a>)</small>` : '')
-        ).join('<br>')
-      ).addTo(map);
-    
-      markers.push(marker);
-    });    
-  
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds().pad(0.2));
-    } else {
-      map.setView([38, -97], 4); // fallback view
-    }
-
-    // Legend
-    const legend = L.control({ position: 'bottomright' });
-    legend.onAdd = function () {
-      const div = L.DomUtil.create('div', 'info legend');
-      const grades = [
-        { label: "1–2 species", color: "white" },
-        { label: "3–5 species", color: "blue" },
-        { label: "6–10 species", color: "green" },
-        { label: "11-15 species", color: "yellow" },
-        { label: "16-20 species", color: "orange" },
-        { label: "20+ species", color: "red" }
-      ];
-      div.innerHTML = `<strong>Species Count</strong><br>`;
-      grades.forEach(g => {
-        div.innerHTML += `
-          <i style="
-            background:${g.color};
-            width:12px;
-            height:12px;
-            display:inline-block;
-            margin-right:6px;
-            border:1px solid #999;
-          "></i>${g.label}<br>`;
+    if (speciesElement && locationName && checklistLink && !isNaN(lat) && !isNaN(lng)) {
+      sightings.push({
+        species: speciesElement.textContent.trim(),
+        locationName,
+        lat,
+        lng,
+        checklistUrl: checklistLink,
+        dateTime: dateTimeText
       });
+    }
+  });
 
-      div.style.background = 'white';
-      div.style.padding = '6px 10px';
-      div.style.borderRadius = '8px';
-      div.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
-      div.style.fontSize = '13px';
-      return div;
-    };
-    legend.addTo(map);
+  const locationMap = new Map();
+  sightings.forEach(({ species, lat, lng, locationName, checklistUrl, dateTime }) => {
+    const key = `${lat},${lng}`;
+    if (!locationMap.has(key)) {
+      locationMap.set(key, {
+        lat, lng, locationName,
+        speciesList: new Map()
+      });
+    }
+    locationMap.get(key).speciesList.set(species, { url: checklistUrl, dateTime });
+  });
+
+  const counts = [...locationMap.values()].map(loc => loc.speciesList.size);
+  const minCount = Math.min(...counts);
+  let maxCount;
+  if (Math.max(...counts) < 21) {
+    maxCount = 20;
+  } else {
+    maxCount = Math.max(...counts);
+  }
+
+  const colorScale = d3.scaleSequential()
+    .domain([minCount, maxCount])
+    .interpolator(d3.interpolateYlOrRd);
+
+  const map = L.map('ebird-map');
+  const markers = [];
+
+  const sorted = [...locationMap.values()].sort((a, b) => a.speciesList.size - b.speciesList.size);
+  sorted.forEach(loc => {
+    const count = loc.speciesList.size;
+    const color = colorScale(count);
+
+    const popupContent = `<strong>${loc.locationName}</strong><br>${count} species:<br>` +
+      [...loc.speciesList.entries()].map(([s, { url, dateTime }]) =>
+        `&bull; <a href="${url}" target="_blank">${s}</a> <small>(${dateTime})</small>`
+      ).join('<br>');
+
+    const marker = L.circleMarker([loc.lat, loc.lng], {
+      radius: 10,
+      fillColor: color,
+      color: '#000',
+      weight: 1,
+      fillOpacity: 0.8
+    }).bindPopup(popupContent).addTo(map);
+
+    markers.push(marker);
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  if (markers.length > 0) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.2));
+  } else {
+    map.setView([38, -97], 4); // fallback
+  }
+
+  // Add gradient legend
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'info legend');
+    div.innerHTML = `<strong>Species Count</strong><br><canvas id="legend-canvas" width="100" height="10"></canvas><br>
+      <div style="display: flex; justify-content: space-between;">
+        <span>${minCount}</span><span>${maxCount}</span>
+      </div>`;
+    return div;
+  };
+  legend.addTo(map);
+
+  // Render D3 gradient in canvas
+  setTimeout(() => {
+    const canvas = document.getElementById('legend-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+    for (let i = 0; i <= 1; i += 0.01) {
+      gradient.addColorStop(i, colorScale(minCount + i * (maxCount - minCount)));
+    }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, 100);
 })();

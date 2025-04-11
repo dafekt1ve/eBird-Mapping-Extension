@@ -11,6 +11,6 @@
       mapScript.src = chrome.runtime.getURL('map.js');
       document.body.appendChild(mapScript);
     };
-    document.body.appendChild(leafletScript);
+    (document.head || document.documentElement).appendChild(leafletScript);
   })();
   
