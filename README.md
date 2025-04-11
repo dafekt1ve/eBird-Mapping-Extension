@@ -13,7 +13,7 @@
 **Firefox Installation instructions**
 
 **To load an unpacked extension in developer mode:**
-  1. Go to the Extensions page by entering "about://debugging" in a new tab.
+  1. Go to the Extensions page by entering "about:debugging" in a new tab.
   2. Click on "This Firefox" on the left-hand navbar.
   3. Click on the "Load Temporary Add-on" on the right of that page.
   4. In the file upload pop-up window, find the downloaded folder and open the "manifest.json".
