@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "eBird Sightings Mapper",
+  "version": "1.0",
+  "description": "Map eBird species sightings by location and count.",
+  "permissions": ["activeTab"],
+  "browser_action": {
+    "default_title": "Map Sightings"
+  },
+  "content_scripts": [],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "web_accessible_resources": [
+    "leaflet/leaflet.js",
+    "leaflet/leaflet.css",
+    "map.js"
+  ],
+  "icons": {
+    "48": "icon.png"
+  }
+}

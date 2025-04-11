@@ -1,0 +1,25 @@
+{
+    "manifest_version": 3,
+    "name": "eBird Map Visualizer",
+    "version": "1.0",
+    "description": "Visualize bird species locations on eBird alert summary pages.",
+    "permissions": ["scripting", "activeTab"],
+    "host_permissions": ["https://ebird.org/alert/summary*"],
+    "action": {
+      "default_title": "Generate eBird Map"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "web_accessible_resources": [
+      {
+        "resources": [
+          "leaflet/leaflet.js",
+          "leaflet/leaflet.css",
+          "map.js"
+        ],
+        "matches": ["<all_urls>"]
+      }
+    ]
+  }
+  
