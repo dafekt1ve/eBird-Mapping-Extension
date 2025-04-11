@@ -26,32 +26,37 @@
   // Function to extract sightings data
   function extractSightings() {
     const sightings = [];
-
-    document.querySelectorAll('.Observation').forEach(entry => {
-      const speciesElement = entry.querySelector('span.Heading-main');  // Updated species selector
-      const locationLink = entry.querySelector('a[href*="www.google.com/maps/search/"]');
-
-      // Check if both species and location link are found
-      if (speciesElement && locationLink) {
-        const species = speciesElement.innerText.trim();
-        const locUrl = locationLink.href;
-
-        const query = locUrl.split('=');
-        const latlng = query[2].split(',');
-        const lat = latlng[0]
-        const lng = latlng[1]
-  
-        if (lat && lng) {
-          sightings.push({
-            species,
-            locationName: locationLink.innerText.trim(),
-            lat: parseFloat(lat),
-            lng: parseFloat(lng)
-          });
-        }
+    const speciesElements = document.querySelectorAll('.Observation');
+    
+    speciesElements.forEach(entry => {
+      const speciesNameElement = entry.querySelector('span.Heading-main'); // ✔️ Species
+      const checklistLink = entry.querySelector('a[title="Checklist"]')?.href; // ✔️ Checklist
+      const dateTimeText = entry.querySelector('a[title="Checklist"]')?.textContent;
+    
+      const locationLink = entry.querySelector('a[href*="www.google.com/maps/search/"]'); // ✔️ Map link
+      const locationName = locationLink?.innerText.trim();
+      const locationUrl = locationLink?.href;
+    
+      // Extract lat/lng from query=39.7392,-104.9903
+      let lat = null, lng = null;
+      if (locationUrl && locationUrl.includes('query=')) {
+        const latlng = locationUrl.split('query=')[1].split(',');
+        lat = parseFloat(latlng[0]);
+        lng = parseFloat(latlng[1]);
+      }
+    
+      if (speciesNameElement && locationName && !isNaN(lat) && !isNaN(lng) && checklistLink) {
+        sightings.push({
+          species: speciesNameElement.textContent.trim(),
+          locationName,
+          lat,
+          lng,
+          checklistUrl: checklistLink,
+          dateTime: dateTimeText || ''
+        });
       }
     });
-
+    
     console.log('Sightings:', sightings);  // Debugging line to check the parsed sightings data
     return sightings;
   }
@@ -64,18 +69,24 @@
     }
 
     const locationMap = new Map();
-    sightings.forEach(s => {
-      const key = `${s.lat},${s.lng}`;
+
+    sightings.forEach(({ species, locationName, lat, lng, checklistUrl, dateTime }) => {
+      const key = `${lat},${lng}`;
       if (!locationMap.has(key)) {
         locationMap.set(key, {
-          lat: s.lat,
-          lng: s.lng,
-          locationName: s.locationName,
-          speciesList: new Set()
+          lat,
+          lng,
+          locationName,
+          speciesList: new Map()  // species → { url, dateTime }
         });
       }
-      locationMap.get(key).speciesList.add(s.species);
-    });
+    
+      const loc = locationMap.get(key);
+      if (!loc.speciesList.has(species)) {
+        loc.speciesList.set(species, { url: checklistUrl, dateTime });
+      }
+    });    
+    
 
     console.log('Location Map:', locationMap);  // Debugging line to check the processed locations and species counts
 
@@ -88,7 +99,7 @@
       if (count > 10) return 'yellow';
       if (count > 5) return 'green';
       if (count > 2) return 'blue';
-      return 'purple';
+      return 'white';
     }
 
     // Convert Map to array and sort by species count ASCENDING
@@ -97,22 +108,25 @@
     );
     
     sortedLocations.forEach(loc => {
-        const speciesCount = loc.speciesList.size;
-        const color = getColor(speciesCount);
+      const speciesCount = loc.speciesList.size;
+      const color = getColor(speciesCount);
     
-        const marker = L.circleMarker([loc.lat, loc.lng], {
+      const marker = L.circleMarker([loc.lat, loc.lng], {
         radius: 10,
         fillColor: color,
         color: '#333',
         weight: 1,
         fillOpacity: 0.8
-        }).bindPopup(
+      }).bindPopup(
         `<strong>${loc.locationName}</strong><br>${speciesCount} species:<br>` +
-        [...loc.speciesList].map(s => `&bull; ${s}`).join('<br>')
-        ).addTo(map);
+        [...loc.speciesList.entries()].map(([species, { url, dateTime }]) =>
+          `&bull; ${species}` +
+          (dateTime ? ` <small>(<a href="${url}" target="_blank">${dateTime}</a>)</small>` : '')
+        ).join('<br>')
+      ).addTo(map);
     
-        markers.push(marker);
-    });
+      markers.push(marker);
+    });    
   
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -131,7 +145,7 @@
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
       const grades = [
-        { label: "1–2 species", color: "purple" },
+        { label: "1–2 species", color: "white" },
         { label: "3–5 species", color: "blue" },
         { label: "6–10 species", color: "green" },
         { label: "11-15 species", color: "yellow" },
