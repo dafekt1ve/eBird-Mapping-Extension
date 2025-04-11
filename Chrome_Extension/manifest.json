@@ -3,7 +3,7 @@
   "name": "eBird Sightings Mapper",
   "version": "1.0",
   "description": "Displays a Leaflet map of eBird sightings colored by species count.",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": ["scripting", "activeTab", "notifications"],
   "host_permissions": [
     "https://ebird.org/alert/*"
   ],

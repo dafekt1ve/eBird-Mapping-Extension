@@ -22,6 +22,16 @@ chrome.action.onClicked.addListener((tab) => {
 
   } else {
     console.log("This extension only works on eBird alert pages.");
+    chrome.notifications.create(
+      "Error",
+      {
+        type: "basic",
+        iconUrl: "icon.png",
+        title: 'Warning',
+        message: 'This extension can only be used on eBird Alert pages.'
+      }
+    );
+    chrome.notifications.clear("Error");
   }
 
 });
