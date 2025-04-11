@@ -58,7 +58,7 @@
   });
 
   const counts = [...locationMap.values()].map(loc => loc.speciesList.size);
-  const minCount = Math.min(...counts);
+  const minCount = 1;
   let maxCount;
   if (Math.max(...counts) < 21) {
     maxCount = 20;

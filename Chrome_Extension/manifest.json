@@ -1,30 +1,36 @@
 {
-    "manifest_version": 3,
-    "name": "eBird Sightings Mapper",
-    "version": "1.0",
-    "description": "Displays a Leaflet map of eBird sightings colored by species count.",
-    "permissions": ["scripting", "activeTab"],
-    "action": {
-      "default_title": "Map Sightings"
-    },
-    "background": {
-      "service_worker": "background.js"
-    },
-    "web_accessible_resources": [
-      {
-        "resources": [
-          "leaflet/leaflet.js",
-          "leaflet/leaflet.css",
-          "d3/d3.v7.min.js",
-          "map.js"
-        ],
-        "matches": ["<all_urls>"]
-      }
-    ],
-    "icons": {
+  "manifest_version": 3,
+  "name": "eBird Sightings Mapper",
+  "version": "1.0",
+  "description": "Displays a Leaflet map of eBird sightings colored by species count.",
+  "permissions": ["scripting", "activeTab"],
+  "host_permissions": [
+    "https://ebird.org/alert/*"
+  ],
+  "action": {
+    "default_title": "Map Sightings",
+    "default_icon": {
       "48": "icon.png"
-    },
-    "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self';"
     }
-  }  
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "leaflet/leaflet.js",
+        "leaflet/leaflet.css",
+        "d3/d3.v7.min.js",
+        "map.js"
+      ],
+      "matches": [ "https://ebird.org/*" ]
+    }
+  ],
+  "icons": {
+    "48": "icon.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
