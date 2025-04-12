@@ -25,7 +25,7 @@
   container.innerHTML = `
     <h2>Sightings Map</h2>
     <label for="days-filter">Show sightings from: 
-      <select id="days-filter" style="margin: 0 0.5rem;">
+      <select id="days-filter" style="width: 200px; margin: 0 0.5rem;">
         ${dayOptions}
       </select>
     </label>
