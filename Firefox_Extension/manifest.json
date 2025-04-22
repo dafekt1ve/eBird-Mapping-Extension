@@ -7,7 +7,10 @@
     "activeTab",
     "tabs",
     "notifications",
-    "https://ebird.org/alert/*"
+    "https://api.ebird.org/*",
+    "https://ebird.org/alert/*",
+    "https://ebird.org/lifelist*",
+    "https://ebird.org/mychecklists*"
   ],
   "background": {
     "scripts": ["background.js"]
@@ -21,8 +24,12 @@
   "web_accessible_resources": [
     "leaflet/leaflet.js",
     "leaflet/leaflet.css",
+    "leaflet/leaflet.js.map",
     "d3/d3.v7.min.js",
-    "map.js"
+    "map.js",
+    "lifelist-map.js",
+    "mychecklists-map.js",
+    "regionLookup/regionLookup.json"
   ],
   "icons": {
     "48": "icon.png"

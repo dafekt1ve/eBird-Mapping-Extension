@@ -5,7 +5,10 @@
   "description": "Displays a Leaflet map of eBird sightings colored by species count.",
   "permissions": ["scripting", "activeTab", "notifications"],
   "host_permissions": [
-    "https://ebird.org/alert/*"
+    "https://api.ebird.org/*",
+    "https://ebird.org/alert/*",
+    "https://ebird.org/lifelist*",
+    "https://ebird.org/mychecklists*"
   ],
   "action": {
     "default_title": "Map Sightings",
@@ -22,7 +25,10 @@
         "leaflet/leaflet.js",
         "leaflet/leaflet.css",
         "d3/d3.v7.min.js",
-        "map.js"
+        "map.js",
+        "lifelist-map.js",
+        "mychecklists-map.js",
+        "regionLookup/regionLookup.json"
       ],
       "matches": [ "https://ebird.org/*" ]
     }
