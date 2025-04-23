@@ -88,79 +88,99 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep port open for async response
   }
 
-  if (message.type === "lookupChecklistLocation") {
-    console.log(message);
-    const { subId, regionCode, date } = message;
-    (async () => {
-      try {
-        console.log("Date to be parsed:", date); // Log to check the format
-        const [year, month, day] = date.split("-");
-        if (!year || !month || !day) {
-          console.error("Invalid date format:", date);
-          return;
-        }
-        console.log("Parsed Year, Month, Day:", year, month, day); // Verify the parsed date components        
-        const url = `https://api.ebird.org/v2/product/lists/${regionCode}/${year}/${month}/${day}`;
-        console.log("Region code:", regionCode); // Log to verify regionCode
-        console.log("Request URL:", url); // Log the URL to verify correctness        
-        const res = await fetch(url, {
-          headers: { "X-eBirdApiToken": EBIRD_API_KEY }
-        });
+  if (message.type === "getChecklistDetails") {
+    const { subId } = message;
+    const url = `https://api.ebird.org/v2/product/checklist/view/${subId}`;
 
-        if (!res.ok) throw new Error(`API error ${res.status}`);
-        const checklists = await res.json();
-        const match = checklists.find(chk => chk.subId === subId);
-
-        if (match?.lat && match?.lng) {
-          sendResponse({ success: true, lat: match.lat, lng: match.lng });
-        } else {
-          sendResponse({ success: false });
-        }
-      } catch (err) {
-        console.error(`[eBird] Checklist lookup error:`, err);
-        sendResponse({ success: false });
+    fetch(url, {
+      headers: {
+        "X-eBirdApiToken": "YOUR_API_KEY" // if needed
       }
-    })();
+    })
+      .then(response => response.json())
+      .then(data => sendResponse({ data }))
+      .catch(error => {
+        console.error("Checklist fetch failed:", error);
+        sendResponse({ error: error.message });
+      });
 
-    return true;
+    return true; // Indicates async response
   }
+  
 
-  if (message.type === "batchChecklistView") {
-    const { subIds } = message;
+  // if (message.type === "lookupChecklistLocation") {
+  //   console.log(message);
+  //   const { subId, regionCode, date } = message;
+  //   (async () => {
+  //     try {
+  //       console.log("Date to be parsed:", date); // Log to check the format
+  //       const [year, month, day] = date.split("-");
+  //       if (!year || !month || !day) {
+  //         console.error("Invalid date format:", date);
+  //         return;
+  //       }
+  //       console.log("Parsed Year, Month, Day:", year, month, day); // Verify the parsed date components        
+  //       const url = `https://api.ebird.org/v2/product/lists/${regionCode}/${year}/${month}/${day}`;
+  //       console.log("Region code:", regionCode); // Log to verify regionCode
+  //       console.log("Request URL:", url); // Log the URL to verify correctness        
+  //       const res = await fetch(url, {
+  //         headers: { "X-eBirdApiToken": EBIRD_API_KEY }
+  //       });
 
-    (async () => {
-      const result = {};
+  //       if (!res.ok) throw new Error(`API error ${res.status}`);
+  //       const checklists = await res.json();
+  //       const match = checklists.find(chk => chk.subId === subId);
 
-      for (const subId of subIds) {
-        const url = `https://api.ebird.org/v2/product/checklist/view/${subId}`;
-        try {
-          const res = await fetch(url, {
-            headers: { "X-eBirdApiToken": EBIRD_API_KEY }
-          });
+  //       if (match?.lat && match?.lng) {
+  //         sendResponse({ success: true, lat: match.lat, lng: match.lng });
+  //       } else {
+  //         sendResponse({ success: false });
+  //       }
+  //     } catch (err) {
+  //       console.error(`[eBird] Checklist lookup error:`, err);
+  //       sendResponse({ success: false });
+  //     }
+  //   })();
 
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.loc?.lat && data?.loc?.lng) {
-              result[subId] = {
-                lat: data.loc.lat,
-                lng: data.loc.lng,
-              };
-            }
-            console.log(`API response for ${subId}:`, data);
-          } else {
-            console.warn(`Error fetching checklist ${subId}:`, res.status);
-            result[subId] = null;
-          }       
-        } catch (err) {
-          console.error(`Error with checklist ${subId}:`, err);
-          result[subId] = null;
-        }
-      }
+  //   return true;
+  // }
 
-      sendResponse(result);
-    })();
+  // if (message.type === "batchChecklistView") {
+  //   const { subIds } = message;
 
-    return true; // Keep port open for async response
-  }
+  //   (async () => {
+  //     const result = {};
+
+  //     for (const subId of subIds) {
+  //       const url = `https://api.ebird.org/v2/product/checklist/view/${subId}`;
+  //       try {
+  //         const res = await fetch(url, {
+  //           headers: { "X-eBirdApiToken": EBIRD_API_KEY }
+  //         });
+
+  //         if (res.ok) {
+  //           const data = await res.json();
+  //           if (data?.loc?.lat && data?.loc?.lng) {
+  //             result[subId] = {
+  //               lat: data.loc.lat,
+  //               lng: data.loc.lng,
+  //             };
+  //           }
+  //           console.log(`API response for ${subId}:`, data);
+  //         } else {
+  //           console.warn(`Error fetching checklist ${subId}:`, res.status);
+  //           result[subId] = null;
+  //         }       
+  //       } catch (err) {
+  //         console.error(`Error with checklist ${subId}:`, err);
+  //         result[subId] = null;
+  //       }
+  //     }
+
+  //     sendResponse(result);
+  //   })();
+
+  //   return true; // Keep port open for async response
+  // }
   
 });

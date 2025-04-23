@@ -1,6 +1,6 @@
 (async function () {
-  if (!window.L && !window.d3) {
-    console.warn('Leaflet and D3 not available.');
+  if (!window.L || !window.d3) {
+    console.warn("Leaflet or D3 not loaded.");
     return;
   }
 
@@ -108,20 +108,68 @@
   const queryResults = {};
   loaderText.textContent = `Fetching data: 0 / ${queryArray.length}`;
 
-  for (let i = 0; i < queryArray.length; i++) {
-    const key = queryArray[i];
-    const result = await new Promise((resolve) => {
+  // --- Throttle and retry logic ---
+  const throttle = (maxConcurrent, delay) => {
+    let active = 0;
+    const queue = [];
+
+    const next = () => {
+      if (queue.length === 0 || active >= maxConcurrent) return;
+      active++;
+      const { fn, resolve } = queue.shift();
+      fn().then((result) => {
+        resolve(result);
+        active--;
+        setTimeout(next, delay);
+      });
+    };
+
+    return async function enqueue(fn) {
+      return new Promise((resolve) => {
+        queue.push({ fn, resolve });
+        next();
+      });
+    };
+  };
+
+  const withRetries = (fn, retries = 3, delay = 1000) => {
+    return async function (...args) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          return await fn(...args);
+        } catch (err) {
+          console.warn(`Retry ${i + 1} failed:`, err);
+          await new Promise(res => setTimeout(res, delay));
+        }
+      }
+      throw new Error("All retries failed");
+    };
+  };
+
+  const throttledSendMessage = throttle(4, 500);
+  const fetchWithRetries = withRetries(async (key) => {
+    return await throttledSendMessage(() => new Promise((resolve) => {
       chrome.runtime.sendMessage({
         type: "batchChecklistFeed",
         queries: [key],
         subIdMap: { [key]: subIdMap[key] }
       }, resolve);
-    });
-    Object.assign(queryResults, result);
-    loaderText.textContent = `Fetching data: ${i + 1} / ${queryArray.length}`;
+    }));
+  });
+
+  for (let i = 0; i < queryArray.length; i++) {
+    const key = queryArray[i];
+    try {
+      const result = await fetchWithRetries(key);
+      Object.assign(queryResults, result);
+      loaderText.textContent = `Fetching data: ${i + 1} / ${queryArray.length}`;
+    } catch (err) {
+      console.error(`Failed to fetch for ${key}:`, err);
+    }
   }
 
   document.getElementById("lifelist-loader")?.remove();
+
 
   const map = L.map("lifelist-map").setView([38, -97], 4);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -172,7 +220,7 @@
         ...d,
         lifers: d.lifers.filter(l => l.year < beforeYear)
       }))
-      .filter(d => d.lifers.length > 0).sort((a, b) => a.lifers.length - b.lifers.length);
+      .filter(d => d.lifers.length > 0).sort((a, b) => a.lifers.length - b.lifers.length);;
 
     const maxCount = Math.max(...filtered.map(d => d.lifers.length), 1);
     colorScale.domain([1, maxCount]);
@@ -263,4 +311,5 @@
     
     container.appendChild(warning);
   }
+
 })();
