@@ -7,6 +7,7 @@
     "activeTab",
     "tabs",
     "notifications",
+    "https://ebird.org/*",
     "https://api.ebird.org/*",
     "https://ebird.org/alert/*",
     "https://ebird.org/lifelist*",
@@ -16,7 +17,7 @@
     "scripts": ["background.js"]
   },
   "browser_action": {
-    "default_title": "Map Sightings",
+    "default_title": "eBird Mapping Extension",
     "default_icon": {
       "48": "icon.png"
     }
@@ -29,7 +30,7 @@
     "map.js",
     "lifelist-map.js",
     "mychecklists-map.js",
-    "regionLookup/regionLookup.json"
+    "regionLookup/regionLookup-expanded.json"
   ],
   "icons": {
     "48": "icon.png"

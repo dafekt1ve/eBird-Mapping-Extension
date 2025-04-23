@@ -42,7 +42,7 @@ chrome.action.onClicked.addListener((tab) => {
       type: "basic",
       iconUrl: "icon.png",
       title: 'Warning',
-      message: 'This extension only works on supported eBird pages.'
+      message: 'This extension only works on eBird alert, lifelist, or checklist pages.'
     });
     chrome.notifications.clear("Error");
   }

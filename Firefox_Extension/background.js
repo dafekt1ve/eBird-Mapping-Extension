@@ -36,16 +36,24 @@ browser.browserAction.onClicked.addListener((tab) => {
           iconUrl: "icon.png",
           title: "Warning",
           message: "Failed to inject required scripts. Check the console."
+        }).then((id) => {
+          console.log("Notification created with ID:", id);
+        }).catch((err) => {
+          console.error("Notification creation failed:", err);
         });
       });
 
   } else {
-    console.log("This extension only works on specific eBird pages.");
+    console.log("This extension only works on eBird alert, lifelist, or MyChecklists pages.");
     browser.notifications.create({
       type: "basic",
       iconUrl: "icon.png",
       title: "Warning",
-      message: "This extension only works on eBird alert, lifelist, or checklist pages."
+      message: "This extension only works on eBird alert, lifelist, or MyChecklists pages."
+    }).then((id) => {
+      console.log("Notification created with ID:", id);
+    }).catch((err) => {
+      console.error("Notification creation failed:", err);
     });
   }
 });

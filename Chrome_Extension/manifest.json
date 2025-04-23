@@ -28,7 +28,7 @@
         "map.js",
         "lifelist-map.js",
         "mychecklists-map.js",
-        "regionLookup/regionLookup.json"
+        "regionLookup/regionLookup-expanded.json"
       ],
       "matches": [ "https://ebird.org/*" ]
     }
