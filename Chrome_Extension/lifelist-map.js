@@ -179,10 +179,30 @@
   const fullLocationMap = new Map();
   const failedLookups = [];
 
+  // for (const { speciesName, queryKey, subId, year, dateStr } of liferData) {
+  //   const feed = queryResults[queryKey] || [];
+  //   const match = feed.find(entry => entry.subId === subId);
+
+  //   if (match?.loc?.lat && match?.loc?.lng) {
+  //     const key = `${match.loc.lat},${match.loc.lng}`;
+  //     if (!fullLocationMap.has(key)) {
+  //       fullLocationMap.set(key, {
+  //         lat: match.loc.lat,
+  //         lng: match.loc.lng,
+  //         locName: match.loc.name || "Unknown location",
+  //         lifers: []
+  //       });
+  //     }
+  //     fullLocationMap.get(key).lifers.push({ speciesName, subId, year, dateStr });
+  //   } else {
+  //     failedLookups.push({ speciesName, subId, queryKey });
+  //   }
+  // }
+
   for (const { speciesName, queryKey, subId, year, dateStr } of liferData) {
     const feed = queryResults[queryKey] || [];
     const match = feed.find(entry => entry.subId === subId);
-
+  
     if (match?.loc?.lat && match?.loc?.lng) {
       const key = `${match.loc.lat},${match.loc.lng}`;
       if (!fullLocationMap.has(key)) {
@@ -195,9 +215,33 @@
       }
       fullLocationMap.get(key).lifers.push({ speciesName, subId, year, dateStr });
     } else {
-      failedLookups.push({ speciesName, subId, queryKey });
+      // Fallback to checklist details API via background.js
+      try {
+        const detail = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "getChecklistDetails", subId }, resolve);
+        });
+  
+        const loc = detail?.location;
+        if (loc?.latitude && loc?.longitude) {
+          const key = `${loc.latitude},${loc.longitude}`;
+          if (!fullLocationMap.has(key)) {
+            fullLocationMap.set(key, {
+              lat: loc.latitude,
+              lng: loc.longitude,
+              locName: loc?.name || "Unknown location",
+              lifers: []
+            });
+          }
+          fullLocationMap.get(key).lifers.push({ speciesName, subId, year, dateStr });
+        } else {
+          failedLookups.push({ speciesName, subId, queryKey });
+        }
+      } catch (err) {
+        console.error(`Fallback failed for ${subId}:`, err);
+        failedLookups.push({ speciesName, subId, queryKey });
+      }
     }
-  }
+  }  
 
   const yearFilter = document.getElementById("lifelist-year-filter");
   const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
