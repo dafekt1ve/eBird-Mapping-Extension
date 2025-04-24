@@ -58,6 +58,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       for (const query of queries) {
         const url = `https://api.ebird.org/v2/product/lists/${query}?maxResults=2000`;
+        console.log(url);
         try {
           const res = await fetch(url, {
             headers: { "X-eBirdApiToken": EBIRD_API_KEY }
@@ -70,7 +71,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               return wanted && wanted.includes(item.subId);
             });
 
-            // console.log(`Filtered data for ${query}:`, filtered);
+            console.log(`Filtered data for ${query}:`, filtered);
             result[query] = filtered;
           } else {
             console.warn(`Non-ok response for ${query}:`, res.status);
@@ -94,7 +95,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     fetch(url, {
       headers: {
-        "X-eBirdApiToken": "YOUR_API_KEY" // if needed
+        "X-eBirdApiToken": EBIRD_API_KEY 
       }
     })
       .then(response => response.json())
