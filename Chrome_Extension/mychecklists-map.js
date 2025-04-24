@@ -4,6 +4,9 @@
     return;
   }
 
+  const existing = document.getElementById("mychecklists-map-container");
+  if (existing) existing.remove();
+
   const container = document.createElement("div");
   container.id = "mychecklists-map-container";
   container.innerHTML = `
