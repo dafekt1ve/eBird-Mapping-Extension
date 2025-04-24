@@ -217,6 +217,7 @@
     } else {
       // Fallback to checklist details API via background.js
       try {
+        console.log("Fallback encountered! for " + speciesName + " " + queryKey);
         const detail = await new Promise((resolve) => {
           chrome.runtime.sendMessage({ type: "getChecklistDetails", subId }, resolve);
         });
