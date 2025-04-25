@@ -91,6 +91,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "getChecklistDetails") {
     const { subId } = message;
+    console.log("SubId: " + subId);
     const url = `https://api.ebird.org/v2/product/checklist/view/${subId}`;
 
     fetch(url, {
@@ -107,4 +108,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true; // Indicates async response
   }  
+
+  if (message.type === "getLocationDetails") {
+    const { locId } = message;
+    console.log("Location ID: " + locId);
+    const url = `https://api.ebird.org/v2/ref/location/info/${locId}`;
+  
+    fetch(url, {
+      headers: {
+        "X-eBirdApiToken": EBIRD_API_KEY
+      }
+    })
+      .then(response => response.json())
+      .then(data => sendResponse({ data }))
+      .catch(error => {
+        console.error("Location fetch failed:", error);
+        sendResponse({ error: error.message });
+      });
+  
+    return true; // Indicates async response
+  }
+  
 });
