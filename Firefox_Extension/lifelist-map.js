@@ -74,130 +74,72 @@
   const observations = nativeSection?.querySelectorAll(".Observation") || [];
 
   const liferData = [];
-  const queryKeys = new Set();
-  const subIdMap = {};
   const yearSet = new Set();
 
   for (const obs of observations) {
     const speciesName = obs.querySelector(".Observation-species .Heading-main")?.innerText?.trim();
     const dateText = obs.querySelector(".Observation-meta-date a")?.innerText?.trim();
-    const locAnchors = obs.querySelectorAll(".Observation-meta-location span a");
-    const regionCode = locAnchors?.[1]?.innerText?.trim();
     const checklistUrl = obs.querySelector(".Observation-meta-date a")?.href;
     const subId = checklistUrl?.split("/").pop();
 
-    if (speciesName && regionCode && dateText && subId) {
+    if (speciesName && dateText && subId) {
       const [day, monthStr, yearStr] = dateText.split(" ");
       const year = parseInt(yearStr);
       yearSet.add(year);
-      const month = new Date(`${monthStr} 1, 2000`).getMonth() + 1;
-      const paddedMonth = String(month).padStart(2, "0");
-      const paddedDay = String(day).padStart(2, "0");
       const dateStr = `${day} ${monthStr} ${yearStr}`;
 
-      const queryKey = `${regionCode}/${yearStr}/${paddedMonth}/${paddedDay}`;
-      queryKeys.add(queryKey);
-      liferData.push({ speciesName, queryKey, subId, year, dateStr });
-
-      if (!subIdMap[queryKey]) subIdMap[queryKey] = [];
-      subIdMap[queryKey].push(subId);
+      liferData.push({ speciesName, subId, year, dateStr });
     }
   }
 
-  const queryArray = Array.from(queryKeys);
-  const queryResults = {};
-  loaderText.textContent = `Fetching data: 0 / ${queryArray.length}`;
+  loaderText.textContent = `Fetching checklist locations...`;
 
-  // --- Throttle and retry logic ---
-  const throttle = (maxConcurrent, delay) => {
-    let active = 0;
-    const queue = [];
+  const fullLocationMap = new Map();
+  const failedLookups = [];
 
-    const next = () => {
-      if (queue.length === 0 || active >= maxConcurrent) return;
-      active++;
-      const { fn, resolve } = queue.shift();
-      fn().then((result) => {
-        resolve(result);
-        active--;
-        setTimeout(next, delay);
-      });
-    };
+  for (let i = 0; i < liferData.length; i++) {
+    const { speciesName, subId, year, dateStr } = liferData[i];
+    loaderText.textContent = `Processing ${i + 1} / ${liferData.length}`;
 
-    return async function enqueue(fn) {
-      return new Promise((resolve) => {
-        queue.push({ fn, resolve });
-        next();
-      });
-    };
-  };
-
-  const withRetries = (fn, retries = 3, delay = 1000) => {
-    return async function (...args) {
-      for (let i = 0; i < retries; i++) {
-        try {
-          return await fn(...args);
-        } catch (err) {
-          console.warn(`Retry ${i + 1} failed:`, err);
-          await new Promise(res => setTimeout(res, delay));
-        }
-      }
-      throw new Error("All retries failed");
-    };
-  };
-
-  const throttledSendMessage = throttle(4, 500);
-  const fetchWithRetries = withRetries(async (key) => {
-    return await throttledSendMessage(() => new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        type: "batchChecklistFeed",
-        queries: [key],
-        subIdMap: { [key]: subIdMap[key] }
-      }, resolve);
-    }));
-  });
-
-  for (let i = 0; i < queryArray.length; i++) {
-    const key = queryArray[i];
     try {
-      const result = await fetchWithRetries(key);
-      Object.assign(queryResults, result);
-      loaderText.textContent = `Fetching data: ${i + 1} / ${queryArray.length}`;
+      const checklist = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "getChecklistDetails", subId }, resolve);
+      });
+
+      const locId = checklist?.data?.locId;
+      if (!locId) throw new Error("No locId found");
+
+      const loc = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "getLocationDetails", locId }, resolve);
+      });
+
+      if (loc?.data?.lat && loc?.data?.lng) {
+        const { lat, lng, locName } = loc.data;
+        const key = `${lat},${lng}`;
+        if (!fullLocationMap.has(key)) {
+          fullLocationMap.set(key, {
+            lat,
+            lng,
+            locName: locName || "Unknown location",
+            lifers: []
+          });
+        }
+        fullLocationMap.get(key).lifers.push({ speciesName, subId, year, dateStr });
+      } else {
+        failedLookups.push({ speciesName, subId });
+      }
     } catch (err) {
-      console.error(`Failed to fetch for ${key}:`, err);
+      console.error(`Failed lookup for ${subId}:`, err);
+      failedLookups.push({ speciesName, subId });
     }
   }
 
   document.getElementById("lifelist-loader")?.remove();
 
-
   const map = L.map("lifelist-map").setView([38, -97], 4);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
-
-  const fullLocationMap = new Map();
-  const failedLookups = [];
-
-  for (const { speciesName, queryKey, subId, year, dateStr } of liferData) {
-    const feed = queryResults[queryKey] || [];
-    const match = feed.find(entry => entry.subId === subId);
-
-    if (match?.loc?.lat && match?.loc?.lng) {
-      const key = `${match.loc.lat},${match.loc.lng}`;
-      if (!fullLocationMap.has(key)) {
-        fullLocationMap.set(key, {
-          lat: match.loc.lat,
-          lng: match.loc.lng,
-          locName: match.loc.name || "Unknown location",
-          lifers: []
-        });
-      }
-      fullLocationMap.get(key).lifers.push({ speciesName, subId, year, dateStr });
-    } else {
-      failedLookups.push({ speciesName, subId, queryKey });
-    }
-  }
 
   const yearFilter = document.getElementById("lifelist-year-filter");
   const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
@@ -220,7 +162,8 @@
         ...d,
         lifers: d.lifers.filter(l => l.year < beforeYear)
       }))
-      .filter(d => d.lifers.length > 0).sort((a, b) => a.lifers.length - b.lifers.length);;
+      .filter(d => d.lifers.length > 0)
+      .sort((a, b) => a.lifers.length - b.lifers.length);
 
     const maxCount = Math.max(...filtered.map(d => d.lifers.length), 1);
     colorScale.domain([1, maxCount]);
@@ -296,19 +239,19 @@
       <span class="lifelist-expandable" style="margin-left: 8px; text-decoration: underline;">Show details...</span>
       <div class="lifelist-hidden">
         ${failedLookups.map(f => {
-          return `• ${f.speciesName} (${f.queryKey}) <a href="https://ebird.org/checklist/${f.subId}" target="_blank" style="margin-left: 1em; font-size: 0.85em;">View checklist</a>`
-          }).join("<br>")};
+          return `• ${f.speciesName} <a href="https://ebird.org/checklist/${f.subId}" target="_blank" style="margin-left: 1em; font-size: 0.85em;">View checklist</a>`;
+        }).join("<br>")}
       </div>
     `;
     const toggle = warning.querySelector(".lifelist-expandable");
     const details = warning.querySelector(".lifelist-hidden");
-    
+
     toggle.addEventListener("click", () => {
       const isHidden = details.style.display === "none" || !details.style.display;
       details.style.display = isHidden ? "block" : "none";
       toggle.textContent = isHidden ? "Hide details..." : "Show details...";
     });
-    
+
     container.appendChild(warning);
   }
 
