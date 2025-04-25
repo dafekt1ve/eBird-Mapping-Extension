@@ -1,6 +1,6 @@
 const EBIRD_API_KEY = "2dhshtjdomjt";
 
-chrome.action.onClicked.addListener((tab) => {
+browser.browserAction.onClicked.addListener((tab) => {
   if (!tab.url) return;
 
   const isAlertPage = tab.url.startsWith("https://ebird.org/alert/");
@@ -8,47 +8,57 @@ chrome.action.onClicked.addListener((tab) => {
   const isMyChecklistsPage = tab.url.startsWith("https://ebird.org/mychecklists");
 
   if (isAlertPage || isLifeListPage || isMyChecklistsPage) {
-    chrome.scripting.insertCSS({
-      target: { tabId: tab.id },
-      files: ["leaflet/leaflet.css"]
-    });
+    // console.log("Injecting scripts for:", tab.url);
 
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["leaflet/leaflet.js"]
-    });
+    browser.tabs.insertCSS(tab.id, { file: "leaflet/leaflet.css" })
+      .then(() => browser.tabs.executeScript(tab.id, { file: "leaflet/leaflet.js" }))
+      .then(() => browser.tabs.executeScript(tab.id, { file: "d3/d3.v7.min.js" }))
+      .then(() => {
+        // console.log("✅ Leaflet & D3 injected");
 
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["d3/d3.v7.min.js"]
-    });
+        // Determine which content script to inject
+        let scriptToInject;
+        if (isAlertPage) {
+          scriptToInject = "map.js";
+        } else if (isLifeListPage) {
+          scriptToInject = "lifelist-map.js";
+        } else if (isMyChecklistsPage) {
+          scriptToInject = "mychecklists-map.js";
+        }
 
-    let scriptToInject;
-    if (isAlertPage) {
-      scriptToInject = "map.js";
-    } else if (isLifeListPage) {
-      scriptToInject = "lifelist-map.js";
-    } else if (isMyChecklistsPage) {
-      scriptToInject = "mychecklists-map.js";
-    }
+        // console.log("Injecting content script:", scriptToInject);
+        return browser.tabs.executeScript(tab.id, { file: scriptToInject });
+      })
+      .catch((err) => {
+        console.error("Script injection failed:", err);
+        browser.notifications.create({
+          type: "basic",
+          iconUrl: "icon.png",
+          title: "Warning",
+          message: "Failed to inject required scripts. Check the console."
+        }).then((id) => {
+          console.log("Notification created with ID:", id);
+        }).catch((err) => {
+          console.error("Notification creation failed:", err);
+        });
+      });
 
-    chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: [scriptToInject]
-    });
   } else {
-    console.log("This extension only works on eBird alert, lifelist, or checklist pages.");
-    chrome.notifications.create("Error", {
+    console.log("This extension only works on eBird alert, lifelist, or MyChecklists pages.");
+    browser.notifications.create({
       type: "basic",
       iconUrl: "icon.png",
-      title: 'Warning',
-      message: 'This extension only works on eBird alert, lifelist, or checklist pages.'
+      title: "Warning",
+      message: "This extension only works on eBird alert, lifelist, or MyChecklists pages."
+    }).then((id) => {
+      console.log("Notification created with ID:", id);
+    }).catch((err) => {
+      console.error("Notification creation failed:", err);
     });
-    chrome.notifications.clear("Error");
   }
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Background received message:', message);
   if (message.type === "batchChecklistFeed") {
     const { queries, subIdMap } = message;
@@ -91,7 +101,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "getChecklistDetails") {
     const { subId } = message;
-    console.log("SubId: " + subId);
     const url = `https://api.ebird.org/v2/product/checklist/view/${subId}`;
 
     fetch(url, {
@@ -106,14 +115,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ error: error.message });
       });
 
-    return true; // Indicates async response
-  }  
+    return true; // Keep the message channel open
+  }
 
   if (message.type === "getLocationDetails") {
     const { locId } = message;
-    console.log("Location ID: " + locId);
     const url = `https://api.ebird.org/v2/ref/location/info/${locId}`;
-  
+
     fetch(url, {
       headers: {
         "X-eBirdApiToken": EBIRD_API_KEY
@@ -125,8 +133,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.error("Location fetch failed:", error);
         sendResponse({ error: error.message });
       });
-  
-    return true; // Indicates async response
+
+    return true;
   }
-  
 });
+  

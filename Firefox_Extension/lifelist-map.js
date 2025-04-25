@@ -1,5 +1,5 @@
 (async function () {
-  if (!window.L || !window.d3) {
+  if (!window.L && !window.d3) {
     console.warn("Leaflet or D3 not loaded.");
     return;
   }
