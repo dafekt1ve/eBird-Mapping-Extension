@@ -8,7 +8,8 @@
     "https://api.ebird.org/*",
     "https://ebird.org/alert/*",
     "https://ebird.org/lifelist*",
-    "https://ebird.org/mychecklists*"
+    "https://ebird.org/mychecklists*",
+    "https://ebird.org/targets*"
   ],
   "action": {
     "default_title": "Map Sightings",
@@ -28,6 +29,7 @@
         "map.js",
         "lifelist-map.js",
         "mychecklists-map.js",
+        "targets-map.js",
         "regionLookup/regionLookup-expanded.json"
       ],
       "matches": [ "https://ebird.org/*" ]
