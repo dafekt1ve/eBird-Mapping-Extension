@@ -210,7 +210,7 @@
         addColorLegend(map, colorScale, 30, 0, "Days Ago");
     
         // Create a LatLngBounds object to track the bounds for fitBounds
-        const bounds = L.latLngBounds();
+        let bounds = L.latLngBounds();
     
         // Sort sightings so oldest plot first
         sightingsData.sort((a, b) => new Date(a.obsDt) - new Date(b.obsDt));
@@ -314,47 +314,38 @@
         mapWrapper.style.width = "100%";
         mapWrapper.style.marginTop = "15px";
         
-        // Create the checkbox for toggling exotic species
-        const filterWrapper = document.createElement("div");
-        filterWrapper.style.marginBottom = "10px";
-        filterWrapper.style.display = "flex";
-        filterWrapper.style.gap = "10px";
-        filterWrapper.style.verticalAlign = "middle";
-        
+        const filterContainer = document.createElement("div");
+        filterContainer.style.margin = "10px 0";
+        filterContainer.style.width = "80%";
+        filterContainer.style.display = "flex";
+
         const exoticCheckbox = document.createElement("input");
         exoticCheckbox.type = "checkbox";
         exoticCheckbox.id = "exotic-toggle";
         exoticCheckbox.checked = false;  // By default, exclude exotics
         exoticCheckbox.style.verticalAlign = "middle";
+        exoticCheckbox.style.margin = "-25px 0px 5px 20px";
         
         const exoticLabel = document.createElement("label");
         exoticLabel.setAttribute("for", "exotic-toggle");
         exoticLabel.textContent = "Exclude Exotic Species";  // Updated label
         
-        filterWrapper.appendChild(exoticCheckbox);
-        filterWrapper.appendChild(exoticLabel);
-        
-        // const dateFilter = document.createElement("select");
-        // dateFilter.id = "date-filter";
-        // dateFilter.style.width = "200px";
-        // dateFilter.style.verticalAlign = "middle";
+        filterContainer.innerHTML = `
+          <label for="daysBackSelect" style="font-weight:bold; margin-right: 8px">Show observations from last:</label>
+          <select id="daysBackSelect" style="width: 40%">
+            <option value="30">30 days (max)</option>
+            <option value="21">3 weeks</option>
+            <option value="14">2 weeks</option>
+            <option value="7">1 week</option>
+            <option value="5">5 days</option>
+            <option value="3">3 days</option>
+            <option value="1">1 day</option>
+          </select>
+        `;
 
-        // const dateFilterLabel = document.createElement("label");
-        // dateFilterLabel.setAttribute("for", "date-filter");
-        // dateFilterLabel.textContent = "Days Back:";  // Updated label
-
-        // const dateArray = ['30 days', '3 weeks', '2 weeks', '1 week', '5 days', '3 days', '1 day'];
-        // const dateValueArray = ['30', '21', '14', '7', '5', '3', '1'];
-        // for (let i = 0; i<dateArray.length; i++){
-        //     const opt = document.createElement('option');
-        //     opt.value = dateValueArray[i];
-        //     opt.innerHTML = dateArray[i];
-        //     dateFilter.appendChild(opt);
-        // }
-        
-        // filterWrapper.appendChild(dateFilterLabel);
-        // filterWrapper.appendChild(dateFilter);
-        insertAfterElement.parentNode.insertBefore(filterWrapper, insertAfterElement.nextSibling);
+        filterContainer.appendChild(exoticCheckbox);
+        filterContainer.appendChild(exoticLabel);
+        insertAfterElement.parentNode.insertBefore(filterContainer, insertAfterElement.nextSibling);
 
         const mapContainer = document.createElement("div");
         mapContainer.style.height = "600px";
@@ -431,62 +422,70 @@
         addColorLegend(map, colorScale, locationsArray[0].species.length, locationsArray.at(-1).species.length, "Species Count");
     
         // Create a LatLngBounds object to fit all the markers
-        const bounds = L.latLngBounds();
+        let bounds = L.latLngBounds();
     
         // Store markers for later removal
         let markers = [];
-    
-        // Filter locations based on the exotic checkbox
+
         function updateMarkers() {
-            const excludeExotics = exoticCheckbox.checked;  // Exclude exotics when checkbox is checked
-            
-            // Clear existing markers
-            markers.forEach(marker => map.removeLayer(marker));
-            markers = [];  // Reset markers array
-    
-            // Filter and create new markers
-            locationsArray.forEach(loc => {
-                const filteredSpecies = loc.species.filter(s => !excludeExotics || (s.exoticCategory !== "X" && s.exoticCategory !== "P" && s.exoticCategory !== "E"));  // Exclude exotics if checked
-                // Skip locations with no displayable species
-                if (filteredSpecies.length === 0) return;
-    
-                // Calculate the new color based on the filtered species count
-                const color = colorScale(filteredSpecies.length);
-    
-                // Create new marker
-                const marker = L.circleMarker([loc.lat, loc.lng], {
-                    radius: 10,
-                    color: "#000",
-                    weight: 1,
-                    fillOpacity: 0.8,
-                    fillColor: color,
-                }).bindPopup(
-                    `<div style="max-height:200px; overflow-y:auto;">
-                    <strong>${loc.species['0'].locName}</strong><br>
-                    <strong>${filteredSpecies.length} Species</strong><br>
-                    ${filteredSpecies.map(s => `<a href="https://ebird.org/checklist/${s.subId}" target="_blank" style="font-weight:bold;">${s.comName}</a> (${s.obsDt})`).join("<br>")}
-                    </div>`
-                );
-    
-                // Add marker to the map
-                marker.addTo(map);
-                markers.push(marker);  // Store marker reference
-    
-                // Extend the bounds to include this marker
-                bounds.extend(marker.getLatLng());
-            });
-    
-            // Set the map's view to fit the bounds of all the markers
-            if (!userMovedMap) {
-                map.fitBounds(bounds);
-            }            
-        }
+          const excludeExotics = exoticCheckbox.checked;
+          const daysBack = parseInt(document.getElementById("daysBackSelect").value, 10);
+      
+          // Calculate the cutoff date for filtering
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+      
+          // Clear existing markers
+          markers.forEach(marker => map.removeLayer(marker));
+          markers = [];
+      
+          // Reset bounds before re-extending
+          bounds = L.latLngBounds();
+      
+          locationsArray.forEach(loc => {
+              // Filter species based on exotics and date
+              const filteredSpecies = loc.species.filter(s => {
+                  const isExotic = s.exoticCategory === "X" || s.exoticCategory === "P" || s.exoticCategory === "E";
+                  const obsDate = new Date(s.obsDt);
+                  return (!excludeExotics || !isExotic) && obsDate >= cutoffDate;
+              });
+      
+              if (filteredSpecies.length === 0) return;
+      
+              // Color scale based on count of recent (and optionally non-exotic) species
+              const color = colorScale(filteredSpecies.length);
+      
+              const marker = L.circleMarker([loc.lat, loc.lng], {
+                  radius: 10,
+                  color: "#000",
+                  weight: 1,
+                  fillOpacity: 0.8,
+                  fillColor: color,
+              }).bindPopup(
+                  `<div style="max-height:200px; overflow-y:auto;">
+                  <strong>${loc.species['0'].locName}</strong><br>
+                  <strong>${filteredSpecies.length} Species</strong><br>
+                  ${filteredSpecies.map(s => `<a href="https://ebird.org/checklist/${s.subId}" target="_blank" style="font-weight:bold;">${s.comName}</a> (${s.obsDt})`).join("<br>")}
+                  </div>`
+              );
+      
+              marker.addTo(map);
+              markers.push(marker);
+              bounds.extend(marker.getLatLng());
+          });
+      
+          if (!userMovedMap && markers.length > 0) {
+              map.fitBounds(bounds);
+          }
+      }
+      
         
         // Initialize markers when the map is first displayed
         updateMarkers();
     
         // Re-filter the map when the checkbox changes
         exoticCheckbox.addEventListener("change", updateMarkers);
+        document.getElementById("daysBackSelect").addEventListener("change", updateMarkers);
     }    
     
 

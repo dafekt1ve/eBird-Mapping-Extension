@@ -89,33 +89,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "batchRecentSightings") {
     console.log("batchRecentSightings message received:", message);
     const { queries } = message;
-
+  
     (async () => {
-      const results = {};
-      for (const { speciesCode, regionCode } of queries) {
-        const url = `https://api.ebird.org/v2/data/obs/${regionCode}/recent/${speciesCode}?back=30&maxResults=100`;
-
-        try {
-          const res = await fetch(url, {
-            headers: { "X-eBirdApiToken": EBIRD_API_KEY }
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            results[`${speciesCode}_${regionCode}`] = data;
-          } else {
-            console.warn(`Non-ok response for ${speciesCode} in ${regionCode}:`, res.status);
+      try {
+        const results = {};
+        for (const { speciesCode, regionCode } of queries) {
+          const url = `https://api.ebird.org/v2/data/obs/${regionCode}/recent/${speciesCode}?back=30&maxResults=100`;
+  
+          try {
+            const res = await fetch(url, {
+              headers: { "X-eBirdApiToken": EBIRD_API_KEY }
+            });
+  
+            if (res.ok) {
+              const data = await res.json();
+              results[`${speciesCode}_${regionCode}`] = data;
+            } else {
+              console.warn(`Non-ok response for ${speciesCode} in ${regionCode}:`, res.status);
+              results[`${speciesCode}_${regionCode}`] = [];
+            }
+          } catch (err) {
+            console.error(`Fetch failed for ${speciesCode} in ${regionCode}:`, err);
             results[`${speciesCode}_${regionCode}`] = [];
           }
-        } catch (err) {
-          console.error(`Fetch failed for ${speciesCode} in ${regionCode}:`, err);
-          results[`${speciesCode}_${regionCode}`] = [];
         }
+  
+        sendResponse(results);
+      } catch (outerError) {
+        console.error("Outer error in batchRecentSightings:", outerError);
+        sendResponse({ error: outerError.message || "Unknown error" });
       }
-
-      sendResponse(results);
     })();
-
+  
     return true;
-  }
+  }  
 });
