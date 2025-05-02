@@ -43,12 +43,12 @@ browser.browserAction.onClicked.addListener((tab) => {
       });
 
   } else {
-    console.log("This extension only works on eBird alert, lifelist, or MyChecklists pages.");
+    console.log("This extension only works on eBird alert, lifelist, MyChecklists, or targets pages.");
     browser.notifications.create({
       type: "basic",
       iconUrl: "icon.png",
       title: "Warning",
-      message: "This extension only works on eBird alert, lifelist, or MyChecklists pages."
+      message: "This extension only works on eBird alert, lifelist, MyChecklists, or targets pages."
     }).then((id) => {
       console.log("Notification created with ID:", id);
     }).catch((err) => {
