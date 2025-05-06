@@ -9,7 +9,9 @@
     "https://ebird.org/alert/*",
     "https://ebird.org/lifelist*",
     "https://ebird.org/mychecklists*",
-    "https://ebird.org/targets*"
+    "https://ebird.org/targets*",
+    "https://ebird.org/checklist/*",
+    "http://localhost:8000/*"
   ],
   "action": {
     "default_title": "Map Sightings",
@@ -25,11 +27,16 @@
       "resources": [
         "leaflet/leaflet.js",
         "leaflet/leaflet.css",
+        "leaflet/leaflet-velocity.min.js",
+        "leaflet/leaflet-velocity.css",
+        "leaflet/leaflet.fullscreen.min.js",
+        "leaflet/leaflet.fullscreen.css",
         "d3/d3.v7.min.js",
         "map.js",
         "lifelist-map.js",
         "mychecklists-map.js",
         "targets-map.js",
+        "checklist-wind-map.js",
         "regionLookup/regionLookup-expanded.json"
       ],
       "matches": [ "https://ebird.org/*" ]

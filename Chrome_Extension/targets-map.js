@@ -150,6 +150,8 @@
     
         // Add scale control
         L.control.scale().addTo(map);
+        map.addControl(new L.Control.Fullscreen());
+
     
         // Color scale for recency
         const colorScale = d3.scaleSequential(d3.interpolateYlOrRd).domain([30, 0]); // 30 days as max recency threshold
@@ -419,6 +421,7 @@
         
         locationsArray.sort((a, b) => a.species.length - b.species.length); // Smallest first
         
+        map.addControl(new L.Control.Fullscreen());
         addColorLegend(map, colorScale, locationsArray[0].species.length, locationsArray.at(-1).species.length, "Species Count");
     
         // Create a LatLngBounds object to fit all the markers
@@ -487,7 +490,6 @@
         exoticCheckbox.addEventListener("change", updateMarkers);
         document.getElementById("daysBackSelect").addEventListener("change", updateMarkers);
     }    
-    
 
   })();
   
