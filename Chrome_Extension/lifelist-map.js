@@ -141,6 +141,8 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
+  map.addControl(new L.Control.Fullscreen());
+
   const yearFilter = document.getElementById("lifelist-year-filter");
   const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
   sortedYears.forEach(y => {

@@ -173,6 +173,8 @@
       ebirdMapInstance.setView([38, -97], 4); // fallback center
     }
 
+    ebirdMapInstance.addControl(new L.Control.Fullscreen());
+
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');

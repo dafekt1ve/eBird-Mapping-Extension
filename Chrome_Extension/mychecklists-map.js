@@ -234,6 +234,10 @@
     }).bindPopup(`<b>${point.name}</b><br>Checklists: ${point.subIds.length}`).addTo(map);
   });
 
+  const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+  map.fitBounds(bounds, { padding: [20, 20] });
+  map.addControl(new L.Control.Fullscreen());
+
   const legend = L.control({ position: "bottomright" });
   legend.onAdd = function () {
     const div = L.DomUtil.create("div", "info legend");

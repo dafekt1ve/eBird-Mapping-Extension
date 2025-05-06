@@ -109,6 +109,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "batchChecklistFeed") {
+    const { queries, subIdMap } = message;
+
+    (async () => {
+      const result = {};
+
+      for (const query of queries) {
+        const url = `https://api.ebird.org/v2/product/lists/${query}?maxResults=2000`;
+        try {
+          const res = await fetch(url, {
+            headers: { "X-eBirdApiToken": EBIRD_API_KEY }
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const filtered = data.filter(item => {
+              const wanted = subIdMap[query];
+              return wanted && wanted.includes(item.subId);
+            });
+
+            // console.log(`Filtered data for ${query}:`, filtered);
+            result[query] = filtered;
+          } else {
+            console.warn(`Non-ok response for ${query}:`, res.status);
+            result[query] = [];
+          }
+        } catch (err) {
+          console.error(`Fetch failed for ${query}:`, err);
+          result[query] = [];
+        }
+      }
+
+      sendResponse(result);
+    })();
+
+    return true; // Keep port open for async response
+  }
+
   if (message.type === "batchRecentSightings") {
     console.log("batchRecentSightings message received:", message);
     const { queries } = message;
@@ -190,6 +228,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true; // Required for async sendResponse
 }
-
-  return false;
 });
