@@ -7,8 +7,9 @@ chrome.action.onClicked.addListener((tab) => {
   const isLifeListPage = tab.url.startsWith("https://ebird.org/lifelist");
   const isMyChecklistsPage = tab.url.startsWith("https://ebird.org/mychecklists");
   const isTargetsPage = tab.url.startsWith("https://ebird.org/targets");
+  const isChecklistPage = tab.url.startsWith("https://ebird.org/checklist/");
 
-  if (isAlertPage || isLifeListPage || isMyChecklistsPage || isTargetsPage) {
+  if (isAlertPage || isLifeListPage || isMyChecklistsPage || isTargetsPage || isChecklistPage) {
     chrome.scripting.insertCSS({
       target: { tabId: tab.id },
       files: ["leaflet/leaflet.css"]
@@ -17,6 +18,16 @@ chrome.action.onClicked.addListener((tab) => {
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ["leaflet/leaflet.js"]
+    });
+
+    chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ["leaflet/leaflet-velocity.css"]
+    });
+
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["leaflet/leaflet-velocity.min.js"]
     });
 
     chrome.scripting.executeScript({
@@ -33,6 +44,8 @@ chrome.action.onClicked.addListener((tab) => {
       scriptToInject = "mychecklists-map.js";
     } else if (isTargetsPage) {
       scriptToInject = "targets-map.js";
+    } else if (isChecklistPage) {
+      scriptToInject = "checklist-wind-map.js";
     }
 
     chrome.scripting.executeScript({
@@ -40,12 +53,12 @@ chrome.action.onClicked.addListener((tab) => {
       files: [scriptToInject]
     });
   } else {
-    console.log("This extension only works on eBird alert, lifelist, targets, or checklist pages.");
+    console.log("This extension only works on eBird alert, lifelist, targets, MyChecklists, or checklist pages.");
     chrome.notifications.create("Error", {
       type: "basic",
       iconUrl: "icon.png",
       title: 'Warning',
-      message: 'This extension only works on eBird alert, lifelist, targets, or checklist pages.'
+      message: 'This extension only works on eBird alert, lifelist, targets, MyChecklists, or checklist pages.'
     });
     chrome.notifications.clear("Error");
   }
@@ -123,4 +136,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
     return true;
   }  
+
+  if (message.type === "fetchGFSData") {
+    const { lat, lon, date } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS data for lat:", lat, "lon:", lon, "date:", date);
+            const response = await fetch("http://localhost:8000/api/get_gfs_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+}
+
+  return false;
 });
