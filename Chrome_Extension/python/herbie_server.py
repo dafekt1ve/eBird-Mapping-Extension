@@ -21,9 +21,10 @@ def get_gfs_data():
     lat = data.get('lat')
     lon = data.get('lon')
     date = data.get('date')
+    level = data.get('level', 850)
 
     try:
-        result = herbie_datagrab.process_wind_data(lat, lon, date)
+        result = herbie_datagrab.process_wind_data(lat, lon, date, level)
         if result is not None:
             return jsonify({"status": "success", "message": result})
         else:

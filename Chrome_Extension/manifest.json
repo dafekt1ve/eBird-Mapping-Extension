@@ -29,17 +29,17 @@
         "leaflet/leaflet.css",
         "leaflet/leaflet-velocity.min.js",
         "leaflet/leaflet-velocity.css",
+        "leaflet/leaflet.fullscreen.min.js",
+        "leaflet/leaflet.fullscreen.css",
+        "leaflet/fullscreen.png",
+        "leaflet/fullscreen@2x.png",
         "d3/d3.v7.min.js",
         "map.js",
         "lifelist-map.js",
         "mychecklists-map.js",
         "targets-map.js",
         "checklist-wind-map.js",
-        "regionLookup/regionLookup-expanded.json",
-        "data/gfs_velocity_800mb.json",
-        "data/gfs_velocity_850mb.json",
-        "data/gfs_velocity_900mb.json",
-        "data/gfs_velocity_925mb.json"
+        "regionLookup/regionLookup-expanded.json"
       ],
       "matches": [ "https://ebird.org/*" ]
     }

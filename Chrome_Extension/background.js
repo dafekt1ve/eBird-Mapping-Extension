@@ -30,6 +30,16 @@ chrome.action.onClicked.addListener((tab) => {
       files: ["leaflet/leaflet-velocity.min.js"]
     });
 
+    chrome.scripting.insertCSS({
+      target: { tabId: tab.id },
+      files: ["leaflet/leaflet.fullscreen.css"]
+    });
+
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["leaflet/leaflet.fullscreen.min.js"]
+    });
+
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ["d3/d3.v7.min.js"]
@@ -138,17 +148,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }  
 
   if (message.type === "fetchGFSData") {
-    const { lat, lon, date } = message;
+    console.log("Received fetchGFSData message:", message);
+    const { lat, lon, date, level } = message;
 
     (async () => {
         try {
-            console.log("Fetching GFS data for lat:", lat, "lon:", lon, "date:", date);
+            console.log("Fetching GFS data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
             const response = await fetch("http://localhost:8000/api/get_gfs_data", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ lat, lon, date }),
+                body: JSON.stringify({ lat, lon, date, level }),
             });
 
             console.log("Request sent.");

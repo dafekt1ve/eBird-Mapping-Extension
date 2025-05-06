@@ -9,113 +9,277 @@
         return;
     }
 
-    // Create the map container
+    // === Cache for wind data per pressure level ===
+    const windDataByLevel = {}; // e.g., { "850": [u, v], ... }
+    let currentVelocityLayer = null;
+
+    // // === Create the dropdown ===
+    // const levelSelect = document.createElement("select");
+    // levelSelect.id = "wind-level-select";
+    // levelSelect.style.margin = "0 0 0.5em 0";
+    // levelSelect.style.padding = "0.4em";
+    // levelSelect.style.borderRadius = "6px";
+
+    // ["925", "900", "850", "800", "750", "700"].forEach(level => {
+    //     const option = document.createElement("option");
+    //     option.value = level;
+    //     option.textContent = `${level} mb`;
+    //     levelSelect.appendChild(option);
+    // });
+    // levelSelect.value = "850"; // default level
+
+    // === Map container ===
     const mapDiv = document.createElement("div");
     mapDiv.id = "gfs-wind-map";
     mapDiv.style =
-        "height: 400px; margin: 1em 0; border: 2px solid #ccc; border-radius: 8px; position: relative;"; // position relative for spinner
+        "height: 400px; margin: 1em 0; border: 2px solid #ccc; border-radius: 8px; position: relative;";
 
+    // === Insert map ===
     const targetElement = document.querySelector("div.Page-section.Page-section--white.Page-section--grid-content.u-inset-responsive div.Page-section-inner");
+    if (!targetElement) return;
     targetElement.parentNode.insertBefore(mapDiv, targetElement);
 
-    // Create the spinner element and insert it into the map container
+    // === Spinner ===
     const spinner = document.createElement("div");
     spinner.id = "loading-spinner";
-    spinner.style.position = "absolute";
-    spinner.style.top = "50%";
-    spinner.style.left = "50%";
-    spinner.style.transform = "translate(-50%, -50%)";
-    spinner.style.width = "50px";
-    spinner.style.height = "50px";
-    spinner.style.border = "6px solid #f3f3f3";
-    spinner.style.borderTop = "6px solid #3498db";
-    spinner.style.borderRadius = "50%";
-    spinner.style.animation = "spin 2s linear infinite";
-    spinner.style.zIndex = "99999"; // Ensure it appears on top of the map
+    spinner.style.cssText = `
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 50px; height: 50px;
+        border: 6px solid #f3f3f3;
+        border-top: 6px solid #3498db;
+        border-radius: 50%;
+        animation: spin 2s linear infinite;
+        z-index: 99999;
+    `;
+    mapDiv.appendChild(spinner);
 
-    mapDiv.appendChild(spinner); // Add the spinner inside the map container
-
-    // Create the overlay element (semi-transparent layer)
+    // === Overlay ===
     const overlay = document.createElement("div");
     overlay.id = "loading-overlay";
-    overlay.style.position = "absolute";
-    overlay.style.top = "0";
-    overlay.style.left = "0";
-    overlay.style.width = "100%";
-    overlay.style.height = "100%";
-    overlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)"; // Semi-transparent black
-    overlay.style.display = "none"; // Hidden by default
-    overlay.style.zIndex = "99998"; // Just below the spinner
+    overlay.style.cssText = `
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: none;
+        z-index: 99998;
+    `;
+    mapDiv.appendChild(overlay);
 
-    mapDiv.appendChild(overlay); // Add the overlay inside the map container
-
-    // CSS animation for the spinner
+    // === Spinner animation ===
     const style = document.createElement("style");
     style.innerHTML = `
     @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
-    }
-    `;
+    }`;
     document.head.appendChild(style);
 
-    // Helper functions to extract coordinates and date from the page
+    // === Coordinate & date extraction ===
     function getLatLonFromLink() {
         const link = document.querySelector("a[title='View with Google Maps']");
         if (!link) return null;
-
-        const url = new URL(link.href);
-        const match = url.search.match(/query=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-        if (match) {
-            return {
-                lat: parseFloat(match[1]),
-                lon: parseFloat(match[2]),
-            };
-        }
-        return null;
+        const match = new URL(link.href).search.match(/query=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+        return match ? { lat: parseFloat(match[1]), lon: parseFloat(match[2]) } : null;
     }
 
-    function getChecklistDate(coords) {
+    function getChecklistDate() {
         const timeEl = document.querySelector("time[datetime]");
         return timeEl?.getAttribute("datetime") ?? null;
     }
 
-    // Request GFS data via background.js
-    function requestGFSDataViaBackground(lat, lon, date) {
+    // === Request wind data from background ===
+    function requestGFSDataViaBackground(lat, lon, date, level) {
         return new Promise((resolve, reject) => {
             chrome.runtime.sendMessage(
                 {
                     type: "fetchGFSData",
-                    lat,
-                    lon,
-                    date
+                    lat, lon, date, level
                 },
                 (response) => {
-                    if (chrome.runtime.lastError) {
-                        return reject(chrome.runtime.lastError);
-                    }
-                    if (response?.success) {
-                        resolve(response.data);
-                    } else {
-                        reject(response?.error || "Unknown error fetching GFS data");
-                    }
+                    if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+                    response?.success ? resolve(response.data) : reject(response?.error || "Unknown error");
                 }
             );
         });
     }
 
-    try {
-        const coords = getLatLonFromLink();
-        const date = getChecklistDate(coords);
-
-        if (!coords || !date) {
-            throw new Error("Failed to get coordinates or date");
+    // === Update wind layer ===
+    function updateWindLayer(level, map, d3ColorScale) {
+        const data = windDataByLevel[level];
+        if (!data || !Array.isArray(data)) {
+            console.error("Invalid or missing data for level", level);
+            return;
         }
 
-        const targetElement = document.querySelector("div.Page-section.Page-section--white.Page-section--grid-content.u-inset-responsive div.Page-section-inner");
-        if (!targetElement) return;
+        if (currentVelocityLayer) map.removeLayer(currentVelocityLayer);
 
-        // Initialize the map
+        const options = getVelocityOptionsForLevel(level);
+
+        currentVelocityLayer = L.velocityLayer({
+            displayValues: true,
+            displayOptions: {
+                speedUnit: "kn",
+                customSpeedUnit: "knots",
+                customSpeedFunction: function (speedInMps) {
+                  return (speedInMps * 1.94384).toFixed(1);  // m/s to knots
+                },
+                velocityType: `${level}mb Wind`,
+                displayPosition: "bottomleft",
+                displayEmptyString: "No wind data",
+                angleConvention: "meteoCCW",
+            },
+            data,
+            velocityScale: 0.005,
+            particleMultiplier: 0.05,
+            lineWidth: 2,
+            colorScale: options.colorScale,
+            maxVelocity: options.maxVelocity,
+        });
+        
+        if (map.isFullscreen()) {
+            currentVelocityLayer.setOptions({
+                particleMultiplier: 0.01 // Lower value for fewer particles
+            });
+            console.log("Fullscreen: ", currentVelocityLayer.options);
+        } else {
+            currentVelocityLayer.setOptions({
+                particleMultiplier: 0.05 // Lower value for fewer particles
+            });      
+            console.log("Not Fullscreen: ", currentVelocityLayer.options);
+        }
+
+        createLegendForLevel(level, options.colorScale, options.maxVelocity);
+
+        currentVelocityLayer.addTo(map);
+    }
+
+    function getVelocityOptionsForLevel(level) {
+        switch (level) {
+          case "925":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateYlGnBu(t));
+            return {
+              colorScale: d3ColorScale,
+              maxVelocity: 20
+            };
+          case "900":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateYlGnBu(t));
+            return {
+                colorScale: d3ColorScale,
+                maxVelocity: 20
+            };
+          case "850":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateBuPu(t));
+            return {
+                colorScale: d3ColorScale,
+                maxVelocity: 30
+            };
+          case "800":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateBuPu(t));
+            return {
+                colorScale: d3ColorScale,
+                maxVelocity: 30
+            };
+          case "750":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateOrRd(t));
+            return {
+                colorScale: d3ColorScale,
+                maxVelocity: 40
+            };
+          case "700":
+            d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateOrRd(t));
+            return {
+              colorScale: d3ColorScale,
+              maxVelocity: 40
+            };
+          default:
+            return {
+              colorScale: ['#91bfdb', '#ffffbf', '#fc8d59'], // Generic fallback
+              maxVelocity: 30
+            };
+        }
+      }
+      
+      function createLegendForLevel(level, colorScale, maxVelocity) {
+        // Remove old legend if it exists
+        d3.select("#velocity-legend").remove();
+      
+        const legendWidth = 300;
+        const legendHeight = 12;
+      
+        const legendSvg = d3.select("#gfs-wind-map").append("div")
+          .attr("id", "velocity-legend")
+          .style("position", "absolute")
+          .style("bottom", "30px")
+          .style("left", "10px")
+          .style("background", "white")
+          .style("padding", "6px")
+          .style("border", "1px solid #ccc")
+          .style("border-radius", "4px")
+          .style("font", "12px sans-serif")
+          .style("z-index", "10000")
+          .append("svg")
+          .attr("width", legendWidth)
+          .attr("height", 30);
+      
+        const scale = d3.scaleLinear()
+          .domain([0, maxVelocity])
+          .range([0, legendWidth]);
+      
+        // Create gradient
+        const defs = legendSvg.append("defs");
+        const gradient = defs.append("linearGradient")
+          .attr("id", "legend-gradient");
+      
+        colorScale.forEach((color, i) => {
+          gradient.append("stop")
+            .attr("offset", `${(i / (colorScale.length - 1)) * 100}%`)
+            .attr("stop-color", color);
+        });
+      
+        legendSvg.append("rect")
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", legendWidth)
+          .attr("height", legendHeight)
+          .style("fill", "url(#legend-gradient)");
+      
+        // Axis
+        const axis = d3.axisBottom(scale)
+          .ticks(5)
+          .tickFormat(d => `${d} kt`);
+      
+        legendSvg.append("g")
+          .attr("transform", `translate(0, ${legendHeight})`)
+          .call(axis);
+      
+        // Label
+        legendSvg.append("text")
+          .attr("x", 0)
+          .attr("y", -4)
+          .text(`Wind speed @ ${level} mb`);
+      }
+      
+
+    // === Main logic ===
+    try {
+        const coords = getLatLonFromLink();
+        const date = getChecklistDate();
+        if (!coords || !date) throw new Error("Missing coordinates or date");
+
+        const checklistDate = new Date(date);
+        const earliestGFSDate = new Date("2021-01-01T00:00:00Z");
+        if (checklistDate < earliestGFSDate) {
+            spinner.style.display = "none";
+            overlay.style.display = "block";
+            const msg = document.createElement("div");
+            msg.style.cssText = "color: #fff; font-size: 18px; text-align: center; margin-top: 180px;";
+            msg.innerText = "No wind data available before January 1, 2021.";
+            overlay.appendChild(msg);
+            return;
+        }
+
         const map = L.map("gfs-wind-map").setView([coords.lat, coords.lon], 5);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 10,
@@ -134,222 +298,93 @@
             fillColor: "#339AF0",
             fillOpacity: 0.9,
             weight: 2,
-        })
-            .addTo(map)
-            .bindPopup("Checklist Location");
+        }).addTo(map).bindPopup("Checklist Location");
 
-        const d3ColorScale = d3
-            .range(0, 1.01, 0.1)
-            .map((t) => d3.interpolateBlues(t));
-
-        // ⬇️ CHECK DATE FIRST
-        const earliestGFSDate = new Date("2021-01-01T00:00:00Z");
-        const checklistDate = new Date(date);
-
-        if (checklistDate < earliestGFSDate) {
-            spinner.style.display = "none";
-            overlay.style.display = "block";
-
-            const errorMessage = document.createElement("div");
-            errorMessage.style.color = "#fff";
-            errorMessage.style.fontSize = "18px";
-            errorMessage.style.textAlign = "center";
-            errorMessage.style.marginTop = "180px";
-            errorMessage.innerText = "No wind data available before January 1, 2021.";
-            overlay.appendChild(errorMessage);
-
-            return;
-        }
-
-        // ⬇️ FETCH GFS WIND DATA from background.js
-        try {
-            const velocityData = await requestGFSDataViaBackground(
-
-                coords.lat,
-                coords.lon,
-                date
-            );
-            console.log(`Checklist date: ${date}, lat/lon: ${coords.lat}, ${coords.lon}`);
-
-            console.log("🚨 velocityData received:", velocityData);
-
-            if (!Array.isArray(velocityData) || !velocityData[0] || !velocityData[1]) {
-                console.error("❌ velocityData is not in expected [u, v] format:", velocityData);
-                return;
-            }
-
-            console.log("✅ Final wind data received:", velocityData);
-            console.log("🧪 First item:", velocityData[0]);
-            console.log("🧪 First item header:", velocityData[0]?.header);
-            console.log("🧪 First item data length:", velocityData[0]?.data?.length);
-
-            // Remove the spinner and overlay once the data is fetched
-            spinner.style.display = "none";
-            overlay.style.display = "none"; // Hide overlay
-
-            const velocityLayer = L.velocityLayer({
-                displayValues: true,
-                displayOptions: {
-                    velocityType: "Global Wind",
-                    displayPosition: "bottomleft",
-                    displayEmptyString: "No wind data",
-                    angleConvention: "bearingCW",
-                    speedUnit: "m/s",
-                },
-                data: velocityData,
-                maxVelocity: 20,
-                velocityScale: 0.005,
-                particleMultiplier: 0.05,
-                lineWidth: 2,
-                colorScale: d3ColorScale,
+        function createPressureControl(map) {
+            return L.Control.extend({
+                options: { position: "topleft" },
+                onAdd: function () {
+                    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+        
+                    const select = L.DomUtil.create("select", "", container);
+                    select.id = "wind-level-select";
+                    select.style.padding = "4px";
+                    select.style.border = "1px solid #ccc";
+                    select.style.borderRadius = "4px";
+                    select.style.background = "#fff";
+                    select.style.fontSize = "14px";
+        
+                    ["925", "900", "850", "800", "750", "700"].forEach(level => {
+                        const option = document.createElement("option");
+                        option.value = level;
+                        option.textContent = `${level} mb`;
+                        select.appendChild(option);
+                    });
+        
+                    select.value = "850"; // default
+        
+                    L.DomEvent.disableClickPropagation(container);
+        
+                    // ✅ Now map is in scope
+                    L.DomEvent.on(select, "change", (e) => {
+                        updateWindLayer(e.target.value, map);
+                    });
+        
+                    return container;
+                }
             });
-
-            velocityLayer.addTo(map);
-        } catch (windError) {
-            // Show overlay with error message if fetch fails
-            spinner.style.display = "none";
-            overlay.style.display = "block"; // Show overlay
-            console.warn("Failed to load wind data:", windError);
-
-            // Optionally, display an error message on the overlay
-            const errorMessage = document.createElement("div");
-            errorMessage.style.color = "#fff";
-            errorMessage.style.fontSize = "18px";
-            errorMessage.style.textAlign = "center";
-            errorMessage.style.marginTop = "180px";
-            errorMessage.innerText = "Failed to load wind data. Please try again later.";
-            overlay.appendChild(errorMessage);
         }
+        
+
+        // or, add to an existing map:
+        map.addControl(new L.Control.Fullscreen());
+        const pressureControl = new (createPressureControl(map))();
+        map.addControl(pressureControl);
+
+        map.on('fullscreenchange', function () {
+            if (map.isFullscreen()) {
+                currentVelocityLayer.setOptions({
+                    particleMultiplier: 0.01 // Lower value for fewer particles
+                });
+                console.log("Fullscreen: ", currentVelocityLayer.options);
+            } else {
+                currentVelocityLayer.setOptions({
+                    particleMultiplier: 0.05 // Lower value for fewer particles
+                });      
+                console.log("Not Fullscreen: ", currentVelocityLayer.options);
+            }
+        });
+
+        let d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateBlues(t));
+
+        // Load all four levels
+        for (const level of ["925", "900", "850", "800", "750", "700"]) {
+            try {
+                const data = await requestGFSDataViaBackground(coords.lat, coords.lon, date, level);
+                if (Array.isArray(data)) windDataByLevel[level] = data;
+            } catch (err) {
+                console.warn(`❌ Failed to fetch ${level}mb data:`, err);
+            }
+        }
+
+        spinner.style.display = "none";
+        overlay.style.display = "none";
+
+        updateWindLayer("850", map, d3ColorScale);
+
+        // Listen for dropdown changes
+        // levelSelect.addEventListener("change", (e) => {
+        //     updateWindLayer(e.target.value, map, d3ColorScale);
+        // });
+          
+
     } catch (error) {
         console.warn("Could not initialize wind map:", error);
-        spinner.style.display = "none"; // Hide spinner if something fails
-        overlay.style.display = "block"; // Show overlay if initialization fails
+        spinner.style.display = "none";
+        overlay.style.display = "block";
+        const msg = document.createElement("div");
+        msg.style.cssText = "color: #fff; font-size: 18px; text-align: center; margin-top: 180px;";
+        msg.innerText = "Failed to load wind data. Please try again later.";
+        overlay.appendChild(msg);
     }
 })();
-  
-
-// (async function () {
-//     if (!window.L && !window.d3) {
-//       console.warn("Leaflet or D3 not loaded.");
-//       return;
-//     }
-  
-//     if (document.getElementById('gfs-wind-map')) {
-//       console.log("Map already exists. Skipping injection.");
-//       return;
-//     }
-  
-//     function getLatLngFromLink() {
-//       const link = document.querySelector("a[title='View with Google Maps']");
-//       if (!link) return null;
-  
-//       const url = new URL(link.href);
-//       const match = url.search.match(/query=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-//       if (match) {
-//         return {
-//           lat: parseFloat(match[1]),
-//           lng: parseFloat(match[2])
-//         };
-//       }
-//       return null;
-//     }
-  
-//     function getChecklistDate() {
-//       const timeEl = document.querySelector("time[datetime]");
-//       return timeEl?.getAttribute("datetime") ?? null;
-//     }
-  
-//     async function requestGFSData(coords, date) {
-//       return new Promise((resolve, reject) => {
-//         chrome.runtime.sendMessage({
-//           type: "fetchGFSData",
-//           lat: coords.lat,
-//           lng: coords.lng,
-//           date: date
-//         }, (response) => {
-//           if (chrome.runtime.lastError) {
-//             reject(new Error(chrome.runtime.lastError.message));
-//           } else if (response?.success) {
-//             resolve(response.data);
-//           } else {
-//             reject(new Error(response?.message || "Unknown error"));
-//           }
-//         });
-//       });
-//     }
-  
-//     try {
-//       const coords = getLatLngFromLink();
-//       const date = getChecklistDate();
-  
-//       if (!coords || !date) {
-//         throw new Error("Failed to get coordinates or date");
-//       }
-  
-//       const targetElement = document.querySelector('div.Page-section.Page-section--white.Page-section--grid-content.u-inset-responsive div.Page-section-inner');
-//       if (!targetElement) return;
-  
-//       const mapDiv = document.createElement('div');
-//       mapDiv.id = 'gfs-wind-map';
-//       mapDiv.style = 'height: 600px; margin: 1em 0; border: 2px solid #ccc; border-radius: 8px;';
-//       mapDiv.dataset.lat = coords.lat;
-//       mapDiv.dataset.lng = coords.lng;
-//       mapDiv.dataset.date = date;
-  
-//       targetElement.parentNode.insertBefore(mapDiv, targetElement);
-  
-//       const map = L.map('gfs-wind-map').setView([coords.lat, coords.lng], 5);
-//       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-//         maxZoom: 10,
-//         attribution: '&copy; OpenStreetMap contributors'
-//       }).addTo(map);
-  
-//       const bounds = [
-//         [coords.lat - 2.5, coords.lng - 3.5],
-//         [coords.lat + 2.5, coords.lng + 3.5]
-//       ];
-//       map.fitBounds(bounds);
-  
-//       L.circleMarker([coords.lat, coords.lng], {
-//         radius: 6,
-//         color: '#007BFF',
-//         fillColor: '#339AF0',
-//         fillOpacity: 0.9,
-//         weight: 2
-//       }).addTo(map).bindPopup("Checklist Location");
-  
-//       const d3ColorScale = d3.range(0, 1.01, 0.1).map(t => d3.interpolateBlues(t));
-  
-//       // Request GFS data through the background script
-//       try {
-//         const velocityData = await requestGFSData(coords, date);
-//         console.log("✅ Received GFS data:", velocityData);
-  
-//         const velocityLayer = L.velocityLayer({
-//           displayValues: true,
-//           displayOptions: {
-//             velocityType: "Wind",
-//             displayPosition: "bottomleft",
-//             displayEmptyString: "No wind data",
-//             angleConvention: "bearingCW",
-//             speedUnit: "m/s",
-//           },
-//           data: velocityData, // Should be the proper JSON array
-//           maxVelocity: 20,
-//           velocityScale: 0.005,
-//           particleMultiplier: 0.05,
-//           lineWidth: 2,
-//           colorScale: d3ColorScale
-//         });
-  
-//         velocityLayer.addTo(map);
-//       } catch (error) {
-//         console.error("❌ Failed to load wind data:", error);
-//       }
-  
-//       console.log(`Checklist date: ${date}, lat/lng: ${coords.lat}, ${coords.lng}`);
-//     } catch (error) {
-//       console.warn("Could not initialize wind map:", error);
-//     }
-//   })();
-  
