@@ -13,21 +13,6 @@
     const windDataByLevel = {}; // e.g., { "850": [u, v], ... }
     let currentVelocityLayer = null;
 
-    // // === Create the dropdown ===
-    // const levelSelect = document.createElement("select");
-    // levelSelect.id = "wind-level-select";
-    // levelSelect.style.margin = "0 0 0.5em 0";
-    // levelSelect.style.padding = "0.4em";
-    // levelSelect.style.borderRadius = "6px";
-
-    // ["925", "900", "850", "800", "750", "700"].forEach(level => {
-    //     const option = document.createElement("option");
-    //     option.value = level;
-    //     option.textContent = `${level} mb`;
-    //     levelSelect.appendChild(option);
-    // });
-    // levelSelect.value = "850"; // default level
-
     // === Map container ===
     const mapDiv = document.createElement("div");
     mapDiv.id = "gfs-wind-map";
@@ -128,7 +113,7 @@
                 velocityType: `${level}mb Wind`,
                 displayPosition: "bottomleft",
                 displayEmptyString: "No wind data",
-                angleConvention: "meteoCCW",
+                angleConvention: "meteoCW",
             },
             data,
             velocityScale: 0.005,
@@ -280,11 +265,49 @@
             return;
         }
 
-        const map = L.map("gfs-wind-map").setView([coords.lat, coords.lon], 5);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 10,
-            attribution: "&copy; OpenStreetMap contributors",
+        const map = L.map("gfs-wind-map", {maxBounds: [[-90, -Infinity], [90, Infinity]]}).setView([coords.lat, coords.lon], 5);
+        let width = document.querySelector("#gfs-wind-map").clientWidth;
+        let height = document.querySelector("#gfs-wind-map").clientHeight;
+        let minZoom = Math.ceil(Math.log2(Math.max(width, height) / 256));
+        map.options.minZoom = minZoom;
+
+        // const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        //     maxZoom: 15,
+        //     attribution: "&copy; OpenStreetMap contributors",
+        // });
+
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+                maxZoom: 15,
+                subdomains:['mt0','mt1','mt2','mt3'],
+                attribution: "&copy; Google",
         }).addTo(map);
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+                maxZoom: 15,
+                subdomains:['mt0','mt1','mt2','mt3'],
+                attribution: "&copy; Google",
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+                maxZoom: 15,
+                subdomains:['mt0','mt1','mt2','mt3'],
+                attribution: "&copy; Google",
+        });
+
+        const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+                maxZoom: 15,
+                subdomains:['mt0','mt1','mt2','mt3'],
+                attribution: "&copy; Google",
+        });
+
+        var baseMaps = {
+            "Streets": googleStreets,
+            "Hybrid": googleHybrid,
+            "Satellite": googleSat,
+            "Terrain": googleTerrain
+        };
+
+        var layerControl = L.control.layers(baseMaps).addTo(map);
 
         const bounds = [
             [coords.lat - 2.5, coords.lon - 3.5],
