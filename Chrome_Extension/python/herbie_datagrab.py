@@ -53,7 +53,7 @@ def process_wind_data(lat, lon, date, level=850):
         velocity_v = convert_wind_to_velocity_json(v, "v", level, target_date, init_date, lon_step, lat_step)
 
         with open(filename, "w") as f:
-            json.dump([velocity_u, velocity_v], f, indent=2)
+            json.dump([velocity_u, velocity_v], f, separators=(',', ':'))
 
         return [velocity_u, velocity_v]
     else:

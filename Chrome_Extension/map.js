@@ -1,5 +1,5 @@
 (function () {
-  if (!window.L && !window.d3) {
+  if (!window.L || !window.d3) {
     console.warn('Leaflet and D3 not available.');
     return;
   }
@@ -17,31 +17,16 @@
   container.id = 'ebird-map-container';
   container.style.margin = '2rem 0';
 
-  const dayOptions = Array.from({ length: 7 }, (_, i) => {
-    const val = i + 1;
-    return `<option value="${val}" ${val === 7 ? 'selected' : ''}> Up to ${val} day${val > 1 ? 's' : ''} ago</option>`;
-  }).join('');
-
-  container.innerHTML = `
-    <h2>Sightings Map</h2>
-    <label for="days-filter">Show sightings from: 
-      <select id="days-filter" style="width: 200px; margin: 0 0.5rem;">
-        ${dayOptions}
-      </select>
-    </label>
-    <div id="ebird-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; margin-top: 1rem;"></div>
-  `;
+  const mapDiv = document.createElement('div');
+  mapDiv.id = 'ebird-map';
+  mapDiv.style.height = '500px';
+  mapDiv.style.width = '100%';
+  mapDiv.style.border = '1px solid #ccc';
+  mapDiv.style.borderRadius = '8px';
+  container.appendChild(mapDiv);
 
   const content = document.querySelector('#content');
   content?.parentNode?.insertBefore(container, content.nextSibling);
-
-  const daysSelect = document.getElementById('days-filter');
-  daysSelect.addEventListener('change', () => {
-    const days = parseInt(daysSelect.value, 10);
-    renderMap(days);
-  });
-
-  renderMap(parseInt(daysSelect.value, 10));
 
   function isRecent(dateStr, daysBack) {
     const now = new Date();
@@ -53,7 +38,35 @@
     return diffDays <= daysBack;
   }
 
-  function renderMap(daysBack) {
+  function createDaysBackControl(initialDays) {
+    return L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function () {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+
+        const select = L.DomUtil.create('select', '', container);
+        select.id = 'days-filter';
+        select.style.all = 'revert';
+
+        for (let i = 1; i <= 7; i++) {
+          const option = document.createElement('option');
+          option.value = i;
+          option.textContent = `${i} day${i > 1 ? 's' : ''} back`;
+          if (i === initialDays) option.selected = true;
+          select.appendChild(option);
+        }
+
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(select, 'change', () => {
+          renderMap(parseInt(select.value, 10));
+        });
+
+        return container;
+      }
+    });
+  }
+
+  function renderMap(daysBack = 7) {
     daysBack = Math.min(daysBack, 7);
 
     const mapElement = document.getElementById('ebird-map');
@@ -72,7 +85,7 @@
     document.querySelectorAll('.Observation').forEach(entry => {
       const speciesElement = entry.querySelector('span.Heading-main');
       const checklistLink = entry.querySelector('a[title="Checklist"]')?.href;
-      const dateTimeText = entry.querySelector('a[title="Checklist"]')?.textContent;  // ← Corrected here
+      const dateTimeText = entry.querySelector('a[title="Checklist"]')?.textContent;
 
       const locationLink = entry.querySelector('a[href*="www.google.com/maps/search/"]');
       const locationName = locationLink?.innerText.trim();
@@ -151,10 +164,6 @@
       markers.push(marker);
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(ebirdMapInstance);
-
     if (markers.length > 0) {
       markers.forEach(marker => marker.addTo(ebirdMapInstance));
 
@@ -174,6 +183,9 @@
     }
 
     ebirdMapInstance.addControl(new L.Control.Fullscreen());
+
+    const DaysBackControl = new (createDaysBackControl(daysBack));
+    ebirdMapInstance.addControl(DaysBackControl);
 
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
@@ -200,4 +212,40 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }, 100);
   }
+
+  // 🔁 Initial map render
+  renderMap(7);
+
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  }).addTo(ebirdMapInstance);
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  var baseMaps = {
+      "Streets": googleStreets,
+      "Hybrid": googleHybrid,
+      "Satellite": googleSat,
+      "Terrain": googleTerrain
+  };
+
+  var layerControl = L.control.layers(baseMaps).addTo(ebirdMapInstance);
 })();

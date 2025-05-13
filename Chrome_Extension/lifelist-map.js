@@ -137,9 +137,39 @@
   document.getElementById("lifelist-loader")?.remove();
 
   const map = L.map("lifelist-map").setView([38, -97], 4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
+  // Add tile layer
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
   }).addTo(map);
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  var baseMaps = {
+      "Streets": googleStreets,
+      "Hybrid": googleHybrid,
+      "Satellite": googleSat,
+      "Terrain": googleTerrain
+  };
+
+  var layerControl = L.control.layers(baseMaps).addTo(map);
 
   map.addControl(new L.Control.Fullscreen());
 

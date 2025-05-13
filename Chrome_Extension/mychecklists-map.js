@@ -65,9 +65,38 @@
   anchor?.parentNode?.insertBefore(container, anchor.nextSibling);
 
   const map = L.map("mychecklists-map").setView([20, 0], 2);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
   }).addTo(map);
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  var baseMaps = {
+      "Streets": googleStreets,
+      "Hybrid": googleHybrid,
+      "Satellite": googleSat,
+      "Terrain": googleTerrain
+  };
+
+  var layerControl = L.control.layers(baseMaps).addTo(map);
 
   const loaderText = document.getElementById("mychecklists-loader-text");
 
@@ -313,26 +342,80 @@
   let totalSteps = checklistInfo.length;
   let stepCounter = 0;
 
-  for (const { subId, date } of checklistInfo) {
-    const details = await fetchChecklistDetails(subId);
-    // console.log("Details:", details);
-    if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {
-      const speciesCount = new Set();
-      for (const [key, value] of Object.entries(details.data.obs)) {
-        speciesCount.add(value.speciesCode);  // Use Set to count unique species
-      }
-      // console.log("Species Count:", speciesCount);
-      const speciesUniqueCount = speciesCount.size;
-      durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesUniqueCount });
-      speciesPerDay.push({ date: new Date(date), speciesCount: speciesUniqueCount });
-      hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
+  const speciesPerDayMap = new Map();  // Map to track species per day
 
-      // Update progress bar
-      stepCounter++;
-      progress = (stepCounter / totalSteps) * 100;
-      updateProgressBar(progress);
+  for (const { subId, date } of checklistInfo) {
+    try {
+      const details = await fetchChecklistDetails(subId);
+      console.log(`Processing checklist ${subId}`);
+
+      if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {
+        const dateString = new Date(date).toISOString().split("T")[0];
+
+        if (!speciesPerDayMap.has(dateString)) {
+          speciesPerDayMap.set(dateString, new Set());
+        }
+
+        if (details.data.obs) {
+          for (const obs of Object.values(details.data.obs)) {
+            if (obs?.speciesCode) {
+              speciesPerDayMap.get(dateString).add(obs.speciesCode);
+            }
+          }
+        }
+
+        durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesPerDayMap.get(dateString).size });
+        hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
+      }
+    } catch (error) {
+      console.error(`Failed on checklist ${subId}:`, error);
     }
+
+    // Keep this outside try/catch so the progress bar doesn't hang
+    stepCounter++;
+    progress = (stepCounter / totalSteps) * 100;
+    updateProgressBar(progress);
   }
+  
+  console.log(speciesPerDayMap);
+  console.log("Finished loop, building speciesPerDay…");
+
+  for (const [dateString, speciesSet] of speciesPerDayMap.entries()) {
+    if (!(speciesSet instanceof Set)) {
+      console.warn("Unexpected speciesSet type:", speciesSet, "on date:", dateString);
+      continue;
+    }
+
+    const date = new Date(dateString);
+    if (isNaN(date)) {
+      console.warn("Invalid dateString:", dateString);
+      continue;
+    }
+
+    speciesPerDay.push({
+      date,
+      speciesCount: speciesSet.size
+    });
+  }
+
+
+  console.log("Finished speciesPerDay…", speciesPerDay);
+  console.log("Sorting speciesPerDay…");
+
+  // Optional: sort the array by date
+  speciesPerDay.sort((a, b) => a.date - b.date);
+
+  console.log("Sorted speciesPerDay…");
+
+  console.log(speciesPerDay);
+
+  document.getElementById('loader').style.display = 'none';
+
+  // Sorting speciesPerDay by date
+  speciesPerDay.sort((a, b) => a.date - b.date);
+
+  console.log("Species Per Day:", speciesPerDay);
+
 
   document.getElementById('loader').style.display = 'none';
   

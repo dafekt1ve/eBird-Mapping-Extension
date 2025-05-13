@@ -144,9 +144,38 @@
         const map = L.map(mapContainer).setView([40.015, -105.2705], 8);
     
         // Add tile layer
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '© OpenStreetMap contributors',
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
         }).addTo(map);
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        var baseMaps = {
+            "Streets": googleStreets,
+            "Hybrid": googleHybrid,
+            "Satellite": googleSat,
+            "Terrain": googleTerrain
+        };
+
+        var layerControl = L.control.layers(baseMaps).addTo(map);
     
         // Add scale control
         L.control.scale().addTo(map);
@@ -316,38 +345,38 @@
         mapWrapper.style.width = "100%";
         mapWrapper.style.marginTop = "15px";
         
-        const filterContainer = document.createElement("div");
-        filterContainer.style.margin = "10px 0";
-        filterContainer.style.width = "80%";
-        filterContainer.style.display = "flex";
+        // const filterContainer = document.createElement("div");
+        // filterContainer.style.margin = "10px 0";
+        // filterContainer.style.width = "80%";
+        // filterContainer.style.display = "flex";
 
-        const exoticCheckbox = document.createElement("input");
-        exoticCheckbox.type = "checkbox";
-        exoticCheckbox.id = "exotic-toggle";
-        exoticCheckbox.checked = false;  // By default, exclude exotics
-        exoticCheckbox.style.verticalAlign = "middle";
-        exoticCheckbox.style.margin = "-25px 0px 5px 20px";
+        // const exoticCheckbox = document.createElement("input");
+        // exoticCheckbox.type = "checkbox";
+        // exoticCheckbox.id = "exotic-toggle";
+        // exoticCheckbox.checked = false;  // By default, exclude exotics
+        // exoticCheckbox.style.verticalAlign = "middle";
+        // exoticCheckbox.style.margin = "-25px 0px 5px 20px";
         
-        const exoticLabel = document.createElement("label");
-        exoticLabel.setAttribute("for", "exotic-toggle");
-        exoticLabel.textContent = "Exclude Exotic Species";  // Updated label
+        // const exoticLabel = document.createElement("label");
+        // exoticLabel.setAttribute("for", "exotic-toggle");
+        // exoticLabel.textContent = "Exclude Exotic Species";  // Updated label
         
-        filterContainer.innerHTML = `
-          <label for="daysBackSelect" style="font-weight:bold; margin-right: 8px">Show observations from last:</label>
-          <select id="daysBackSelect" style="width: 40%">
-            <option value="30">30 days (max)</option>
-            <option value="21">3 weeks</option>
-            <option value="14">2 weeks</option>
-            <option value="7">1 week</option>
-            <option value="5">5 days</option>
-            <option value="3">3 days</option>
-            <option value="1">1 day</option>
-          </select>
-        `;
+        // filterContainer.innerHTML = `
+        //   <label for="daysBackSelect" style="font-weight:bold; margin-right: 8px">Show observations from last:</label>
+        //   <select id="daysBackSelect" style="width: 40%">
+        //     <option value="30">30 days (max)</option>
+        //     <option value="21">3 weeks</option>
+        //     <option value="14">2 weeks</option>
+        //     <option value="7">1 week</option>
+        //     <option value="5">5 days</option>
+        //     <option value="3">3 days</option>
+        //     <option value="1">1 day</option>
+        //   </select>
+        // `;
 
-        filterContainer.appendChild(exoticCheckbox);
-        filterContainer.appendChild(exoticLabel);
-        insertAfterElement.parentNode.insertBefore(filterContainer, insertAfterElement.nextSibling);
+        // filterContainer.appendChild(exoticCheckbox);
+        // filterContainer.appendChild(exoticLabel);
+        // insertAfterElement.parentNode.insertBefore(filterContainer, insertAfterElement.nextSibling);
 
         const mapContainer = document.createElement("div");
         mapContainer.style.height = "600px";
@@ -365,9 +394,39 @@
         map.on('zoomstart', () => { userMovedMap = true; });
         map.on('dragstart', () => { userMovedMap = true; });
         
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '© OpenStreetMap contributors',
+        // Add tile layer
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
         }).addTo(map);
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+              maxZoom: 15,
+              subdomains:['mt0','mt1','mt2','mt3'],
+              attribution: "&copy; Google",
+        });
+
+        var baseMaps = {
+            "Streets": googleStreets,
+            "Hybrid": googleHybrid,
+            "Satellite": googleSat,
+            "Terrain": googleTerrain
+        };
+
+        var layerControl = L.control.layers(baseMaps).addTo(map);
         
         L.control.scale().addTo(map);
         
@@ -423,6 +482,151 @@
         
         map.addControl(new L.Control.Fullscreen());
         addColorLegend(map, colorScale, locationsArray[0].species.length, locationsArray.at(-1).species.length, "Species Count");
+
+        // Add control inside the map
+        // const filterControl = L.control({ position: "topleft" });
+        // filterControl.onAdd = function () {
+        //   const container = L.DomUtil.create("div", "leaflet-control-custom");
+        //   container.style.backgroundColor = "white";
+        //   container.style.padding = "8px";
+        //   container.style.borderRadius = "4px";
+        //   container.style.boxShadow = "0 1px 5px rgba(0,0,0,0.4)";
+        //   container.style.fontSize = "14px";
+
+        //   // Days Back
+        //   const daysLabel = document.createElement("label");
+        //   // daysLabel.textContent = "Days Back: ";
+        //   daysLabel.htmlFor = "daysBack";
+
+        //   const daysSelect = document.createElement("select");
+        //   daysSelect.id = "daysBack";
+        //   [1, 3, 7, 14, 30].forEach((val) => {
+        //     const option = document.createElement("option");
+        //     option.value = val;
+        //     option.textContent = `${val} Days Back`;
+        //     daysSelect.appendChild(option);
+        //   });
+
+        //   daysSelect.value = "30"; // default
+
+        //   // Exotics
+        //   const exoticsLabel = document.createElement("label");
+        //   exoticsLabel.style.marginLeft = "10px";
+        //   exoticsLabel.textContent = "Exclude Exotics";
+        //   exoticsLabel.style.whiteSpace = "nowrap";
+
+        //   const exoticsCheckbox = document.createElement("input");
+        //   exoticsCheckbox.type = "checkbox";
+        //   exoticsCheckbox.id = "showExotics";
+        //   exoticsLabel.prepend(exoticsCheckbox);
+
+        //   exoticsCheckbox.checked = false; // default
+
+        //   // Append
+        //   mapContainer.appendChild(daysLabel);
+        //   mapContainer.appendChild(daysSelect);
+        //   mapContainer.appendChild(exoticsLabel);
+
+        //   // Stop map interactions when clicking in the control
+        //   L.DomEvent.disableClickPropagation(container);
+
+        //   // Hook up filter logic if needed
+        //   daysSelect.addEventListener("change", updateMarkers);
+        //   exoticsCheckbox.addEventListener("change", updateMarkers);
+
+        //   return container;
+        // };
+        // filterControl.addTo(map);
+
+        function createDaysBackControl(map) {
+            return L.Control.extend({
+                options: { position: "topleft" },
+                onAdd: function () {
+                    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+        
+                    const daysSelect = document.createElement("select");
+                    daysSelect.id = "daysBack";
+                    daysSelect.style.all = 'revert';
+
+                    const daysLabel = document.createElement("label");
+                    daysLabel.htmlFor = "daysBack";
+
+                    daysSelect.style.padding = "4px";
+                    daysSelect.style.border = "1px solid #ccc";
+                    daysSelect.style.borderRadius = "4px";
+                    daysSelect.style.background = "#fff";
+                    daysSelect.style.fontSize = "14px";
+                    daysSelect.style.fontWeight = "bold";
+                    daysSelect.style.marginBottom = "0px"; 
+
+                    [1, 3, 7, 14, 30].forEach((val) => {
+                      const option = document.createElement("option");
+                      option.value = val;
+                      option.textContent = `${val} Days Back`;
+                      daysSelect.appendChild(option);
+                    });
+
+                    daysSelect.value = "30"; // default
+        
+                    daysLabel.appendChild(daysSelect);
+                    container.appendChild(daysLabel);
+
+                    L.DomEvent.disableClickPropagation(container);
+        
+                    // ✅ Now map is in scope
+                    L.DomEvent.on(daysSelect, "change", (e) => {
+                        updateMarkers();
+                    });
+        
+                    return container;
+                }
+            });
+        }
+
+        function createExoticsControl(map) {
+            return L.Control.extend({
+                options: { position: "topleft" },
+                onAdd: function () {
+                    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+                    container.style.backgroundColor = "#fff";
+                    
+                    const exoticsLabel = document.createElement("label");
+                    exoticsLabel.style.marginLeft = "10px";
+                    exoticsLabel.style.marginBottom = "0px";
+                    exoticsLabel.textContent = "Exclude Exotics";
+                    exoticsLabel.style.whiteSpace = "nowrap";
+                    exoticsLabel.style.fontWeight = "bold"; 
+                    exoticsLabel.style.paddingRight = "4px";
+                    // exoticsLabel.style.backgroundColor = "#fff";
+
+                    const exoticsCheckbox = document.createElement("input");
+                    exoticsCheckbox.type = "checkbox";
+                    exoticsCheckbox.id = "showExotics";
+                    exoticsCheckbox.style.marginBottom = "0px";
+                    exoticsLabel.prepend(exoticsCheckbox);
+
+                    exoticsCheckbox.checked = false; // default
+
+                    exoticsLabel.prepend(exoticsCheckbox);
+                    container.appendChild(exoticsLabel);
+        
+                    L.DomEvent.disableClickPropagation(container);
+        
+                    // ✅ Now map is in scope
+                    L.DomEvent.on(exoticsCheckbox, "change", (e) => {
+                        updateMarkers();
+                    });
+        
+                    return container;
+                }
+            });
+        }
+
+        const daysBackControl = new (createDaysBackControl(map))();
+        map.addControl(daysBackControl);
+
+        const exoticsControl = new (createExoticsControl(map))();
+        map.addControl(exoticsControl);
     
         // Create a LatLngBounds object to fit all the markers
         let bounds = L.latLngBounds();
@@ -431,8 +635,9 @@
         let markers = [];
 
         function updateMarkers() {
-          const excludeExotics = exoticCheckbox.checked;
-          const daysBack = parseInt(document.getElementById("daysBackSelect").value, 10);
+          const exoticsCheckbox = document.getElementById("showExotics");
+          const excludeExotics = exoticsCheckbox.checked;
+          const daysBack = parseInt(document.getElementById("daysBack").value, 10);
       
           // Calculate the cutoff date for filtering
           const cutoffDate = new Date();
@@ -487,8 +692,9 @@
         updateMarkers();
     
         // Re-filter the map when the checkbox changes
-        exoticCheckbox.addEventListener("change", updateMarkers);
-        document.getElementById("daysBackSelect").addEventListener("change", updateMarkers);
+        const exoticsCheckbox = document.getElementById("showExotics");
+        exoticsCheckbox.addEventListener("change", updateMarkers);
+        document.getElementById("daysBack").addEventListener("change", updateMarkers);
     }    
 
   })();
