@@ -7,16 +7,31 @@
   const existing = document.getElementById("lifelist-map-container");
   if (existing) existing.remove();
 
+  // const list = document.querySelector("Heading Heading--h1 Heading--thin Heading--reverse u-margin-none");
+  const list = document.getElementsByClassName("Heading-main");
+  const typeOfList = list[1].innerText;
+  const typeOfListSplit = typeOfList.split(" ");
+  let typeOfBird;
+  if (typeOfListSplit.length > 2) {
+    typeOfBird = typeOfListSplit[1] + " Bird";
+  } else {
+    typeOfBird = typeOfListSplit[0] + "r";
+  }
+
   const container = document.createElement("div");
   container.id = "lifelist-map-container";
   container.innerHTML = `
-    <h2>Your Life List Map</h2>
-    <label style="font-weight: bold; margin-right: 8px;">Show birds seen before:</label>
-    <select id="lifelist-year-filter" style="width: 200px; margin: 0 0.5rem;"></select>
-    <button id="lifelist-clear-filter" class="Button Button--pill Button--small Button--hollow" style="padding: 4px 10px; font-size: 0.9em;">Clear</button>
+    <h2>Your ${typeOfList} Map</h2>
     <div id="lifelist-loader" class="lifelist-loader-container">
       <div class="lifelist-spinner"></div>
-      <div id="lifelist-loader-text">Collecting lifers...</div>
+      <div id="lifelist-loader-text">Collecting birds...</div>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="lifelist-year-filter">Filter by year:</label>
+      <select id="lifelist-year-filter" style="width: 200px">
+        <option value="">All</option>
+      </select>
+      <button id="lifelist-clear-filter" class="Button u-margin-none u-inset-sm" style="margin-left: 10px;">Clear Filter</button>
     </div>
     <div id="lifelist-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0;"></div>
     <style>
@@ -69,6 +84,43 @@
   anchor?.parentNode?.insertBefore(container, anchor);
 
   const loaderText = document.getElementById("lifelist-loader-text");
+
+  const map = L.map("lifelist-map").setView([38, -97], 4);
+  // Add tile layer
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  }).addTo(map);
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  var baseMaps = {
+      "Streets": googleStreets,
+      "Hybrid": googleHybrid,
+      "Satellite": googleSat,
+      "Terrain": googleTerrain
+  };
+
+  var layerControl = L.control.layers(baseMaps).addTo(map);
+
+  map.addControl(new L.Control.Fullscreen());
 
   const nativeSection = document.querySelector("#nativeNatProv");
   const observations = nativeSection?.querySelectorAll(".Observation") || [];
@@ -136,43 +188,6 @@
 
   document.getElementById("lifelist-loader")?.remove();
 
-  const map = L.map("lifelist-map").setView([38, -97], 4);
-  // Add tile layer
-  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  }).addTo(map);
-
-  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  var baseMaps = {
-      "Streets": googleStreets,
-      "Hybrid": googleHybrid,
-      "Satellite": googleSat,
-      "Terrain": googleTerrain
-  };
-
-  var layerControl = L.control.layers(baseMaps).addTo(map);
-
-  map.addControl(new L.Control.Fullscreen());
-
   const yearFilter = document.getElementById("lifelist-year-filter");
   const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
   sortedYears.forEach(y => {
@@ -184,6 +199,7 @@
 
   const colorScale = d3.scaleSequential(d3.interpolateYlOrRd);
   let currentMarkers = [];
+  let originalMaxCount = null;
 
   const renderMarkers = (beforeYear) => {
     currentMarkers.forEach(m => map.removeLayer(m));
@@ -192,20 +208,23 @@
     const filtered = Array.from(fullLocationMap.values())
       .map(d => ({
         ...d,
-        lifers: d.lifers.filter(l => l.year < beforeYear)
+        lifers: d.lifers.filter(l => l.year <= beforeYear)
       }))
       .filter(d => d.lifers.length > 0)
       .sort((a, b) => a.lifers.length - b.lifers.length);
 
-    const maxCount = Math.max(...filtered.map(d => d.lifers.length), 1);
-    colorScale.domain([1, maxCount]);
+    if (originalMaxCount === null) {
+      const maxCount = Math.max(...filtered.map(d => d.lifers.length), 1);
+      originalMaxCount = maxCount;
+    }
+    colorScale.domain([1, originalMaxCount]);
 
     for (const data of filtered) {
       const count = data.lifers.length;
       const color = colorScale(count);
       const popupContent = `
         <div class="lifelist-popup-location">${data.locName}</div>
-        <div><strong>${count} lifer${count > 1 ? "s" : ""}</strong></div>
+        <div><strong>${count} ${typeOfBird}${count > 1 ? "s" : ""}</strong></div>
         <div class="lifelist-popup-list">
           ${data.lifers.map(l => `• <a href="https://ebird.org/checklist/${l.subId}" target="_blank">${l.speciesName}</a> (${l.dateStr})`).join("<br>")}
         </div>
@@ -229,7 +248,8 @@
   };
 
   yearFilter.addEventListener("change", () => {
-    renderMarkers(parseInt(yearFilter.value));
+    const val = yearFilter.value;
+    renderMarkers(val ? parseInt(val) : Infinity);
   });
 
   document.getElementById("lifelist-clear-filter").addEventListener("click", () => {
@@ -244,7 +264,7 @@
     const div = L.DomUtil.create("div", "info legend");
     div.innerHTML = `<strong>Species Count</strong><br><canvas id="legend-canvas" width="100" height="10"></canvas><br>
       <div style="display: flex; justify-content: space-between;">
-        <span>1</span><span>Max</span>
+        <span>1</span><span>${originalMaxCount}</span>
       </div>`;
     return div;
   };

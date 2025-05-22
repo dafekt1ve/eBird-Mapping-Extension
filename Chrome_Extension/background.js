@@ -20,6 +20,11 @@ chrome.action.onClicked.addListener((tab) => {
       files: ["leaflet/leaflet.js"]
     });
 
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["leaflet/leaflet-heat.js"]
+    });
+
     chrome.scripting.insertCSS({
       target: { tabId: tab.id },
       files: ["leaflet/leaflet-velocity.css"]
@@ -185,14 +190,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }  
 
-  if (message.type === "fetchGFSData") {
-    console.log("Received fetchGFSData message:", message);
+  if (message.type === "fetchGFSWindData") {
+    console.log("Received fetchGFSWindData message:", message);
     const { lat, lon, date, level } = message;
 
     (async () => {
         try {
-            console.log("Fetching GFS data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
-            const response = await fetch("http://localhost:8000/api/get_gfs_data", {
+            console.log("Fetching GFS wind data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_wind_data", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -228,4 +233,358 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     return true; // Required for async sendResponse
   }
+
+  if (message.type === "fetchGFSCloudData") {
+    console.log("Received fetchGFSCloudData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS cloud data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_cloud_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSPrecipData") {
+    console.log("Received fetchGFSPrecipData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS precip data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_precip_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSSfcTempData") {
+    console.log("Received fetchGFSSfcTempData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS sfc temp data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_sfc_temp_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSRefcData") {
+    console.log("Received fetchGFSRefcData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS reflectivity data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_refc_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSVvelData") {
+    console.log("Received fetchGFSVvelData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS vertical velocity data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_vvel_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSCapeData") {
+    console.log("Received fetchGFSCapeData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS CAPE data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_cape_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+
+  if (message.type === "fetchGFSCinData") {
+    console.log("Received fetchGFSCinData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS CIN data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_cin_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
+  if (message.type === "fetchGFSDivData") {
+    console.log("Received fetchGFSDivData message:", message);
+    const { lat, lon, date, level } = message;
+
+    (async () => {
+        try {
+            console.log("Fetching GFS Divergence data for lat:", lat, "lon:", lon, "date:", date, "level:", level);
+            const response = await fetch("http://localhost:8000/api/get_gfs_divergence_data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ lat, lon, date, level }),
+            });
+
+            console.log("Request sent.");
+
+            if (!response.ok) {
+                // If the response is not successful, log the error and return failure
+                console.error(`Server returned an error: ${response.status} ${response.statusText}`);
+                sendResponse({ success: false, error: `Server returned an error: ${response.status}` });
+                return;
+            }
+
+            const result = await response.json();
+            console.log("🔁 Full response from server:", result);
+
+            if (result.status === "success" && result.message) {
+              sendResponse({ success: true, data: result.message });
+            } else {
+              console.warn("API returned failure:", result.message);
+              sendResponse({ success: false, error: result.message || result.status });
+            }
+            
+        } catch (err) {
+            // Catch network or JSON parsing errors
+            console.error("Failed to fetch GFS from server:", err);
+            sendResponse({ success: false, error: err.message });
+        }
+    })();
+
+    return true; // Required for async sendResponse
+  }
+
 });

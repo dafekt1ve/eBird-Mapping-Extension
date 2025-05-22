@@ -337,18 +337,20 @@
 
   const durations = [];
   const speciesPerDay = [];
-  const hoursPerDay = [];
+  // const hoursPerDay = [];
 
   let totalSteps = checklistInfo.length;
   let stepCounter = 0;
 
   const speciesPerDayMap = new Map();  // Map to track species per day
+  const hoursPerDayMap = new Map();
 
   for (const { subId, date } of checklistInfo) {
     try {
       const details = await fetchChecklistDetails(subId);
-      console.log(`Processing checklist ${subId}`);
+      // console.log(`Processing checklist ${subId}`);
 
+      // console.log("Details:", details);
       if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {
         const dateString = new Date(date).toISOString().split("T")[0];
 
@@ -363,9 +365,15 @@
             }
           }
         }
+        
+        hoursPerDayMap.set(
+          dateString,
+          (hoursPerDayMap.get(dateString) || 0) + parseFloat(details.data.durationHrs)
+        );
 
-        durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesPerDayMap.get(dateString).size });
-        hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
+
+        // durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesPerDayMap.get(dateString).size });
+        // hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
       }
     } catch (error) {
       console.error(`Failed on checklist ${subId}:`, error);
@@ -376,65 +384,25 @@
     progress = (stepCounter / totalSteps) * 100;
     updateProgressBar(progress);
   }
-  
-  console.log(speciesPerDayMap);
-  console.log("Finished loop, building speciesPerDay…");
 
-  for (const [dateString, speciesSet] of speciesPerDayMap.entries()) {
-    if (!(speciesSet instanceof Set)) {
-      console.warn("Unexpected speciesSet type:", speciesSet, "on date:", dateString);
-      continue;
-    }
-
-    const date = new Date(dateString);
-    if (isNaN(date)) {
-      console.warn("Invalid dateString:", dateString);
-      continue;
-    }
-
-    speciesPerDay.push({
-      date,
-      speciesCount: speciesSet.size
-    });
-  }
-
-
-  console.log("Finished speciesPerDay…", speciesPerDay);
-  console.log("Sorting speciesPerDay…");
-
-  // Optional: sort the array by date
-  speciesPerDay.sort((a, b) => a.date - b.date);
-
-  console.log("Sorted speciesPerDay…");
-
-  console.log(speciesPerDay);
-
-  document.getElementById('loader').style.display = 'none';
-
-  // Sorting speciesPerDay by date
-  speciesPerDay.sort((a, b) => a.date - b.date);
-
-  console.log("Species Per Day:", speciesPerDay);
-
+  const sortedSpeciesPerDayMap = new Map(
+    [...speciesPerDayMap.entries()].sort(([dateA], [dateB]) =>
+      new Date(dateA) - new Date(dateB)
+    )
+  );
 
   document.getElementById('loader').style.display = 'none';
   
   // Grouping the durations and species count by date
   const dateMap = new Map();
-  for (const { date, hours, speciesCount } of durations) {
-    const dateString = date.toISOString().split("T")[0];  // e.g. "2025-05-06"
-    
-    if (dateMap.has(dateString)) {
-      dateMap.set(dateString, {
-        hours: dateMap.get(dateString).hours + hours, // Sum the hours for the same date
-        speciesCount: dateMap.get(dateString).speciesCount + speciesCount // Sum the species counts
-      });
-    } else {
-      dateMap.set(dateString, { hours, speciesCount });
-    }
+
+  for (const [dateString, speciesSet] of sortedSpeciesPerDayMap.entries()) {
+    dateMap.set(dateString, {
+      speciesCount: speciesSet.size,
+      hours: hoursPerDayMap.get(dateString) || 0
+    });
   }
 
-  // Sort by date
   const aggregatedData = Array.from(dateMap.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
 
   // Preparing the data for plotting
@@ -447,9 +415,6 @@
     values.push(cumulativeHours); // Store cumulative hours
     // Optionally, store species counts separately or on the same graph
   }
-
-  console.log("Labels:", labels); // Check labels
-  console.log("Values:", values); // Check values
   
   // Set up SVG dimensions
   const margin = { top: 20, right: 80, bottom: 40, left: 80 };

@@ -31,6 +31,7 @@
         "leaflet/leaflet-velocity.css",
         "leaflet/leaflet.fullscreen.min.js",
         "leaflet/leaflet.fullscreen.css",
+        "leaflet/leaflet-heat.js",
         "d3/d3.v7.min.js",
         "map.js",
         "lifelist-map.js",

@@ -6,7 +6,10 @@
 
   let ebirdMapInstance = null;
   let lastMapView = null;
+  let lastBaseLayer = null;
   let hasCenteredOnce = false;
+  let layerControl = null;
+  let legendControl = null;
 
   const existingContainer = document.getElementById('ebird-map-container');
   if (existingContainer) {
@@ -43,7 +46,6 @@
       options: { position: 'topleft' },
       onAdd: function () {
         const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-
         const select = L.DomUtil.create('select', '', container);
         select.id = 'days-filter';
         select.style.all = 'revert';
@@ -66,21 +68,49 @@
     });
   }
 
+  // Define base layers once
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const baseMaps = {
+    "Streets": googleStreets,
+    "Hybrid": googleHybrid,
+    "Satellite": googleSat,
+    "Terrain": googleTerrain
+  };
+
   function renderMap(daysBack = 7) {
     daysBack = Math.min(daysBack, 7);
 
     const mapElement = document.getElementById('ebird-map');
-    mapElement.innerHTML = '';
 
-    if (ebirdMapInstance) {
-      lastMapView = {
-        center: ebirdMapInstance.getCenter(),
-        zoom: ebirdMapInstance.getZoom()
-      };
-      ebirdMapInstance.remove();
-      ebirdMapInstance = null;
+    // Only clear if map hasn't been initialized
+    if (!ebirdMapInstance) {
+      mapElement.innerHTML = '';
     }
 
+    // Collect data
     const sightings = [];
     document.querySelectorAll('.Observation').forEach(entry => {
       const speciesElement = entry.querySelector('span.Heading-main');
@@ -135,7 +165,34 @@
       .domain([minCount, maxCount])
       .interpolator(d3.interpolateYlOrRd);
 
-    ebirdMapInstance = L.map('ebird-map');
+    // 🔄 Initialize or reuse map
+    if (!ebirdMapInstance) {
+      ebirdMapInstance = L.map('ebird-map', {
+        layers: [googleStreets]
+      });
+
+      ebirdMapInstance.addControl(new L.Control.Fullscreen());
+
+      const DaysBackControl = new (createDaysBackControl(daysBack));
+      ebirdMapInstance.addControl(DaysBackControl);
+
+      layerControl = L.control.layers(baseMaps).addTo(ebirdMapInstance);
+
+      // Set default layer
+      lastBaseLayer = googleStreets;
+    } else {
+      // Remove all non-base layers
+      ebirdMapInstance.eachLayer(layer => {
+        if (!Object.values(baseMaps).includes(layer)) {
+          ebirdMapInstance.removeLayer(layer);
+        }
+      });
+
+      // Reset base layer to the last one used
+      if (lastBaseLayer && !ebirdMapInstance.hasLayer(lastBaseLayer)) {
+        lastBaseLayer.addTo(ebirdMapInstance);
+      }
+    }
 
     const markers = [];
 
@@ -171,34 +228,34 @@
         const group = L.featureGroup(markers);
         ebirdMapInstance.fitBounds(group.getBounds().pad(0.2));
         hasCenteredOnce = true;
-        lastMapView = {
-          center: ebirdMapInstance.getCenter(),
-          zoom: ebirdMapInstance.getZoom()
-        };
-      } else {
+      } else if (lastMapView) {
         ebirdMapInstance.setView(lastMapView.center, lastMapView.zoom);
       }
     } else {
-      ebirdMapInstance.setView([38, -97], 4); // fallback center
+      ebirdMapInstance.setView([38, -97], 4);
     }
 
-    ebirdMapInstance.addControl(new L.Control.Fullscreen());
-
-    const DaysBackControl = new (createDaysBackControl(daysBack));
-    ebirdMapInstance.addControl(DaysBackControl);
-
-    const legend = L.control({ position: 'bottomright' });
-    legend.onAdd = function () {
-      const div = L.DomUtil.create('div', 'info legend');
-      div.innerHTML = `
-        <strong>Species Count</strong><br>
-        <canvas id="legend-canvas" width="100" height="10"></canvas><br>
-        <div style="display: flex; justify-content: space-between;">
-          <span>${minCount}</span><span>${maxCount}</span>
-        </div>`;
-      return div;
+    lastMapView = {
+      center: ebirdMapInstance.getCenter(),
+      zoom: ebirdMapInstance.getZoom()
     };
-    legend.addTo(ebirdMapInstance);
+
+    lastBaseLayer = Object.entries(baseMaps).find(([name, layer]) => ebirdMapInstance.hasLayer(layer))?.[1] || googleStreets;
+
+    if (!legendControl) {
+      legendControl = L.control({ position: 'bottomright' });
+      legendControl.onAdd = function () {
+        const div = L.DomUtil.create('div', 'info legend');
+        div.innerHTML = `
+          <strong>Species Count</strong><br>
+          <canvas id="legend-canvas" width="100" height="10"></canvas><br>
+          <div style="display: flex; justify-content: space-between;">
+            <span>${minCount}</span><span>${maxCount}</span>
+          </div>`;
+        return div;
+      };
+      legendControl.addTo(ebirdMapInstance);
+    }
 
     setTimeout(() => {
       const canvas = document.getElementById('legend-canvas');
@@ -213,39 +270,5 @@
     }, 100);
   }
 
-  // 🔁 Initial map render
   renderMap(7);
-
-  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  }).addTo(ebirdMapInstance);
-
-  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
-        maxZoom: 15,
-        subdomains:['mt0','mt1','mt2','mt3'],
-        attribution: "&copy; Google",
-  });
-
-  var baseMaps = {
-      "Streets": googleStreets,
-      "Hybrid": googleHybrid,
-      "Satellite": googleSat,
-      "Terrain": googleTerrain
-  };
-
-  var layerControl = L.control.layers(baseMaps).addTo(ebirdMapInstance);
 })();
