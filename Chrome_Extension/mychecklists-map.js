@@ -15,14 +15,6 @@
       <div class="mychecklists-spinner"></div>
       <div id="mychecklists-loader-text">Loading checklist locations...</div>
     </div>
-    <div style="margin-bottom: 10px;">
-      <label style="margin-right: 10px;">
-        <input type="checkbox" id="toggle-gps-tracks" checked> Show GPS Tracks
-      </label>
-      <label>
-        <input type="checkbox" id="toggle-markers" checked> Show Markers
-      </label>
-    </div>
     <div id="mychecklists-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0;"></div>
     <div id="loader" style="display: none; text-align: center; margin-top: 20px;">
       <span>Loading...</span>
@@ -73,35 +65,56 @@
   anchor?.parentNode?.insertBefore(container, anchor.nextSibling);
 
   const map = L.map("mychecklists-map").setView([20, 0], 2);
-  L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
-    attribution: "&copy; Google",
-    maxZoom: 20
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
   }).addTo(map);
 
-  // Layer groups for toggling
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{
+        maxZoom: 15,
+        subdomains:['mt0','mt1','mt2','mt3'],
+        attribution: "&copy; Google",
+  });
+
+  // NEW: Create layer groups for GPS tracks and markers
   const gpsTrackLayer = L.layerGroup().addTo(map);
   const markerLayer = L.layerGroup().addTo(map);
 
-  // Toggle controls
-  document.getElementById('toggle-gps-tracks').addEventListener('change', (e) => {
-    if (e.target.checked) {
-      map.addLayer(gpsTrackLayer);
-    } else {
-      map.removeLayer(gpsTrackLayer);
-    }
-  });
+  var baseMaps = {
+      "Streets": googleStreets,
+      "Hybrid": googleHybrid,
+      "Satellite": googleSat,
+      "Terrain": googleTerrain
+  };
 
-  document.getElementById('toggle-markers').addEventListener('change', (e) => {
-    if (e.target.checked) {
-      map.addLayer(markerLayer);
-    } else {
-      map.removeLayer(markerLayer);
-    }
-  });
+  // NEW: Add overlay layers to control
+  var overlayMaps = {
+      "GPS Tracks": gpsTrackLayer,
+      "Markers": markerLayer
+  };
+
+  var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
 
   const loaderText = document.getElementById("mychecklists-loader-text");
 
-  const regionLookup = await fetch(chrome.runtime.getURL("regionLookup/regionLookup-expanded.json"))
+  // Detect if we're in Chrome or Firefox for extension API
+  const isFirefox = typeof browser !== 'undefined';
+  const extensionAPI = isFirefox ? browser : chrome;
+
+  const regionLookup = await fetch(extensionAPI.runtime.getURL("regionLookup/regionLookup-expanded.json"))
     .then(r => r.json())
     .catch(() => ({}));
 
@@ -228,14 +241,14 @@
 
   const fetchChecklistBatch = withRetries((query) => {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
+      extensionAPI.runtime.sendMessage({
         type: "batchChecklistFeed",
         queries: [query],
         subIdMap: { [query]: subIdMap[query] },
         fallbackSubIds: []
       }, (response) => {
-        if (chrome.runtime.lastError || !response) {
-          reject(chrome.runtime.lastError || new Error("Empty response"));
+        if (extensionAPI.runtime.lastError || !response) {
+          reject(extensionAPI.runtime.lastError || new Error("Empty response"));
         } else {
           resolve(response[query] || []);
         }
@@ -245,12 +258,12 @@
 
   const fetchChecklistDetails = withRetries((subId) => {
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({
+      extensionAPI.runtime.sendMessage({
         type: "getChecklistDetails",
         subId
       }, (response) => {
-        if (chrome.runtime.lastError || !response) {
-          reject(chrome.runtime.lastError || new Error("No response from details"));
+        if (extensionAPI.runtime.lastError || !response) {
+          reject(extensionAPI.runtime.lastError || new Error("No response from details"));
         } else {
           resolve(response);
         }
@@ -331,7 +344,7 @@
     return coords;
   });
 
-  await throttleRequests(trackTasks, 3); // Lower concurrency for GPS track fetching
+  await throttleRequests(trackTasks, 3);
 
   document.getElementById("mychecklists-loader")?.remove();
 
@@ -377,58 +390,85 @@
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Show loader when starting
   document.getElementById('loader').style.display = 'block';
   let progress = 0;
 
-  // Update progress function
   function updateProgressBar(progress) {
     const progressBar = document.getElementById('progress-bar');
     progressBar.style.width = `${progress}%`;
   }
 
-// Begin d3 charting
-
   const durations = [];
   const speciesPerDay = [];
-  const hoursPerDay = [];
 
   let totalSteps = checklistInfo.length;
   let stepCounter = 0;
 
-  for (const { subId, date } of checklistInfo) {
-    const details = await fetchChecklistDetails(subId);
-    if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {
-      const speciesCount = new Set();
-      for (const [key, value] of Object.entries(details.data.obs)) {
-        speciesCount.add(value.speciesCode);
-      }
-      const speciesUniqueCount = speciesCount.size;
-      durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesUniqueCount });
-      speciesPerDay.push({ date: new Date(date), speciesCount: speciesUniqueCount });
-      hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
+  const speciesPerDayMap = new Map();
+  const hoursPerDayMap = new Map();
 
-      stepCounter++;
-      progress = (stepCounter / totalSteps) * 100;
-      updateProgressBar(progress);
+  for (const { subId, date } of checklistInfo) {
+    try {
+      const details = await fetchChecklistDetails(subId);
+      const dateString = new Date(date).toISOString().split("T")[0];
+
+      if (!speciesPerDayMap.has(dateString)) {
+        speciesPerDayMap.set(dateString, new Set());
+      }
+
+      if (details.data.obs) {
+        for (const obs of Object.values(details.data.obs)) {
+          if (obs?.speciesCode) {
+            speciesPerDayMap.get(dateString).add(obs.speciesCode);
+          }
+        }
+      }
+
+      if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {        
+        hoursPerDayMap.set(
+          dateString,
+          (hoursPerDayMap.get(dateString) || 0) + parseFloat(details.data.durationHrs)
+        );
+      } else {
+        hoursPerDayMap.set(
+          dateString,
+          (hoursPerDayMap.get(dateString) || 0) + 0
+        );
+      }
+    } catch (error) {
+      console.error(`Failed on checklist ${subId}:`, error);
     }
+
+    stepCounter++;
+    progress = (stepCounter / totalSteps) * 100;
+    updateProgressBar(progress);
   }
+
+  function daysBetween(date1, date2) {
+    const start = new Date(date1);
+    const end = new Date(date2);
+    const timeDifference = Math.abs(end.getTime() - start.getTime());
+    const daysDifference = Math.round(timeDifference / (1000 * 60 * 60 * 24));
+    return daysDifference;
+  }
+
+  const sortedSpeciesPerDayMap = new Map(
+    [...speciesPerDayMap.entries()].sort(([dateA], [dateB]) =>
+      new Date(dateA) - new Date(dateB)
+    )
+  );
+
+  const daysTotal = daysBetween([...sortedSpeciesPerDayMap.keys()][0], [...sortedSpeciesPerDayMap.keys()][sortedSpeciesPerDayMap.size-1]);
 
   document.getElementById('loader').style.display = 'none';
   
-  // Grouping the durations and species count by date
   const dateMap = new Map();
-  for (const { date, hours, speciesCount } of durations) {
-    const dateString = date.toISOString().split("T")[0];
-    
-    if (dateMap.has(dateString)) {
-      dateMap.set(dateString, {
-        hours: dateMap.get(dateString).hours + hours,
-        speciesCount: dateMap.get(dateString).speciesCount + speciesCount
-      });
-    } else {
-      dateMap.set(dateString, { hours, speciesCount });
-    }
+
+  for (const [dateString, speciesSet] of sortedSpeciesPerDayMap.entries()) {
+    dateMap.set(dateString, {
+      speciesCount: speciesSet.size,
+      hours: hoursPerDayMap.get(dateString) || 0
+    });
   }
 
   const aggregatedData = Array.from(dateMap.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
@@ -437,7 +477,7 @@
   const values = [];
   let cumulativeHours = 0;
   for (const [date, { hours, speciesCount }] of aggregatedData) {
-    cumulativeHours += hours;
+    cumulativeHours += isNaN(hours) ? 0 : hours;
     labels.push(date);
     values.push(cumulativeHours);
   }
@@ -468,17 +508,27 @@
     .nice()
     .range([height, 0]);
   
+  const baseTicks = 5;
+  const maxTickLabels = Math.floor(width / 80);
+  const tickCount = Math.min(maxTickLabels, baseTicks);
+
+  const [start, end] = x.domain();
+  const tickStep = (end - start) / (tickCount - 1);
+  const tickDates = d3.range(tickCount).map(i => new Date(start.getTime() + i * tickStep));
+
   svg.append("g")
     .attr("class", "x-axis")
     .attr("transform", "translate(0," + height + ")")
-    .call(d3.axisBottom(x).ticks(d3.timeMonth.every(1)));
-  
+    .call(d3.axisBottom(x)
+        .tickValues(tickDates)
+        .tickFormat(d3.timeFormat("%b '%y")));
+
   svg.append("g")
     .attr("class", "y-axis")
     .call(d3.axisLeft(y));
 
   const yRight = d3.scaleLinear()
-    .domain([0, d3.max(aggregatedData, d => Math.max(d[1].speciesCount, d[1].hours))])
+    .domain([0, d3.max(aggregatedData, d => Math.max(d[1].speciesCount || 0, d[1].hours || 0))])
     .nice()
     .range([height, 0]);
   
@@ -486,16 +536,29 @@
     .attr("class", "y-axis-right")
     .attr("transform", `translate(${width},0)`)
     .call(d3.axisRight(yRight));
-  
+
+  svg.append("clipPath")
+    .attr("id", "clip")
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height);
+
+  const plotArea = svg.append("g")
+    .attr('class', 'plot-area')
+    .attr('clip-path', 'url(#clip)');
+
   const line = d3.line()
+    .defined(d => d.hours != null && d.date != null)
     .x(d => x(parseDate(d.date)))
     .y(d => y(d.hours));
 
   const speciesLine = d3.line()
+    .defined(d => d.speciesCount != null && d.date != null)
     .x(d => x(parseDate(d.date)))
     .y(d => yRight(d.speciesCount));
   
   const hoursPerDayLine = d3.line()
+    .defined(d => d.hours != null && d.date != null)
     .x(d => x(parseDate(d.date)))
     .y(d => yRight(d.hours));
   
@@ -504,7 +567,7 @@
     hours: values[index]
   }));
   
-  svg.append("path")
+  plotArea.append("path")
     .data([data])
     .attr("class", "line")
     .attr("d", line)
@@ -512,7 +575,7 @@
     .attr("stroke", "#28a745")
     .attr("stroke-width", 2);
   
-  svg.append("path")
+  plotArea.append("path")
     .data([data])
     .attr("class", "area")
     .attr("d", d3.area()
@@ -523,32 +586,37 @@
 
   const tooltip = d3.select("#tooltip");
 
-  const speciesData = aggregatedData.map(([date, { speciesCount }]) => ({
-    date,
-    speciesCount
-  }));
+  function getBarWidth(scale) {
+    const baseWidth = width / daysTotal;
+    return Math.max(1, baseWidth * scale);
+  }
 
-  svg.append("path")
-    .data([speciesData])
-    .attr("class", "species-line")
-    .attr("d", speciesLine)
-    .attr("fill", "none")
-    .attr("stroke", "#007bff")
-    .attr("stroke-width", 2);
+  const barWidth = getBarWidth(1);
+  const barPadding = Math.max(0, barWidth * 0.1);
 
-  const hoursPerDayData = aggregatedData.map(([date, { hours }]) => ({
-    date,
-    hours
-  }));
+  plotArea.selectAll(".species-bar")
+    .data(aggregatedData)
+    .enter()
+    .append("rect")
+    .attr("class", "species-bar bar")
+    .attr("x", d => x(parseDate(d[0])))
+    .attr("y", d => yRight(d[1].speciesCount))
+    .attr("width", Math.max(0.5, barWidth - barPadding))
+    .attr("height", d => height - yRight(d[1].speciesCount))
+    .attr("fill", "#007bff")
+    .attr("opacity", 0.7);
 
-  svg.append("path")
-    .data([hoursPerDayData])
-    .attr("class", "hours-per-day-line")
-    .attr("d", hoursPerDayLine)
-    .attr("fill", "none")
-    .attr("stroke", "#ffc107")
-    .attr("stroke-width", 2)
-    .attr("stroke-dasharray", "4 2");
+  plotArea.selectAll(".hours-bar")
+    .data(aggregatedData)
+    .enter()
+    .append("rect")
+    .attr("class", "hours-bar bar")
+    .attr("x", d => x(parseDate(d[0])))
+    .attr("y", d => yRight(d[1].hours))
+    .attr("width", Math.max(0.5, barWidth - barPadding))
+    .attr("height", d => height - yRight(d[1].hours))
+    .attr("fill", "#ffc107")
+    .attr("opacity", 0.7);
   
   svg.append("text")
     .attr("transform", "translate(" + (width / 2) + " ," + (height + margin.bottom - 10) + ")")
@@ -579,7 +647,8 @@
 
   function mousemove(event) {
     const bisectDate = d3.bisector(d => parseDate(d.date)).left;
-    const x0 = x.invert(d3.pointer(event)[0]);
+    const [mx] = d3.pointer(event, svg.node());
+    const x0 = x.invert(mx);
     const i = bisectDate(data, x0, 1);
     const d0 = data[i - 1];
     const d1 = data[i];
@@ -616,6 +685,7 @@
   svg.append("rect")
     .attr("width", width)
     .attr("height", height)
+    .attr("class", "zoom-rect")
     .style("fill", "none")
     .style("pointer-events", "all")
     .on("mousemove", mousemove)
@@ -655,45 +725,60 @@
     .text(d => d.label)
     .style("font-size", "12px")
     .attr("alignment-baseline", "middle");
-    
+
   const zoom = d3.zoom()
-    .scaleExtent([1, 10])
+    .scaleExtent([1, daysTotal/10])
     .translateExtent([[0, 0], [width, height]])
+    .extent([[0, 0], [width, height]])
     .on("zoom", zoomed);
 
+  svg.call(zoom);
+
   function zoomed(event) {
-    const transform = event.transform;
-    const newX = transform.rescaleX(x);
+    const newX = event.transform.rescaleX(xOriginal);
+    x.domain(newX.domain());
+
+    let tickFormat = d3.timeFormat("%b '%y");
+    if (event.transform.k < 2) {
+      tickFormat = d3.timeFormat("%b '%y");
+    } else {
+      tickFormat = d3.timeFormat("%b %d '%y"); 
+    }
   
-    svg.selectAll(".line")
+    const baseTicks = 5;
+    const maxTickLabels = Math.floor(width / 80);
+    const tickCount = Math.min(maxTickLabels, Math.round(baseTicks * event.transform.k));
+
+    const [start, end] = newX.domain();
+    const tickStep = (end - start) / (tickCount - 1);
+    const tickDates = d3.range(tickCount).map(i => new Date(start.getTime() + i * tickStep));
+
+    const barWidth = getBarWidth(event.transform.k);
+    const barPadding = Math.max(0, barWidth * 0.1);
+
+    svg.select(".x-axis")
+      .call(d3.axisBottom(newX)
+        .tickValues(tickDates)
+        .tickFormat(tickFormat));
+
+    svg.select(".line")
       .attr("d", d3.line()
         .x(d => newX(parseDate(d.date)))
-        .y(d => y(d.hours))
-      );
-  
-    svg.selectAll(".species-line")
-      .attr("d", d3.line()
-        .x(d => newX(parseDate(d.date)))
-        .y(d => yRight(d.speciesCount))
-      );
-  
-    svg.selectAll(".hours-per-day-line")
-      .attr("d", d3.line()
-        .x(d => newX(parseDate(d.date)))
-        .y(d => yRight(d.hours))
-      );
-  
-    svg.selectAll(".area")
+        .y(d => y(d.hours)));
+
+    svg.select(".area")
       .attr("d", d3.area()
         .x(d => newX(parseDate(d.date)))
         .y0(height)
-        .y1(d => y(d.hours))
-      );
-  
-    svg.select(".x-axis")
-      .call(d3.axisBottom(newX).ticks(d3.timeMonth.every(1)));
+        .y1(d => y(d.hours)));
+
+    svg.selectAll(".bar")
+      .attr("x", d => {
+        const parsed = parseDate(d[0]);
+        const xVal = newX(parsed);
+        return xVal;
+      })
+      .attr("width", Math.max(0.5, barWidth - barPadding));
   }
 
-  svg.call(zoom);
-  
 })();
