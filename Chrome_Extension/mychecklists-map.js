@@ -15,6 +15,14 @@
       <div class="mychecklists-spinner"></div>
       <div id="mychecklists-loader-text">Loading checklist locations...</div>
     </div>
+    <div style="margin-bottom: 10px;">
+      <label style="margin-right: 10px;">
+        <input type="checkbox" id="toggle-gps-tracks" checked> Show GPS Tracks
+      </label>
+      <label>
+        <input type="checkbox" id="toggle-markers" checked> Show Markers
+      </label>
+    </div>
     <div id="mychecklists-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0;"></div>
     <div id="loader" style="display: none; text-align: center; margin-top: 20px;">
       <span>Loading...</span>
@@ -65,9 +73,31 @@
   anchor?.parentNode?.insertBefore(container, anchor.nextSibling);
 
   const map = L.map("mychecklists-map").setView([20, 0], 2);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
+  L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+    attribution: "&copy; Google",
+    maxZoom: 20
   }).addTo(map);
+
+  // Layer groups for toggling
+  const gpsTrackLayer = L.layerGroup().addTo(map);
+  const markerLayer = L.layerGroup().addTo(map);
+
+  // Toggle controls
+  document.getElementById('toggle-gps-tracks').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      map.addLayer(gpsTrackLayer);
+    } else {
+      map.removeLayer(gpsTrackLayer);
+    }
+  });
+
+  document.getElementById('toggle-markers').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      map.addLayer(markerLayer);
+    } else {
+      map.removeLayer(markerLayer);
+    }
+  });
 
   const loaderText = document.getElementById("mychecklists-loader-text");
 
@@ -228,6 +258,32 @@
     });
   });
 
+  // NEW: Function to fetch GPS track data from checklist page
+  async function fetchGPSTrack(subId) {
+    try {
+      const response = await fetch(`https://ebird.org/checklist/${subId}`);
+      const html = await response.text();
+      
+      const match = html.match(/data-maptrack-data="([^"]+)"/);
+      if (match) {
+        const coordString = match[1];
+        const coords = [];
+        const parts = coordString.split(',');
+        
+        // Convert "lng,lat,lng,lat" to [[lat,lng], [lat,lng], ...]
+        for (let i = 0; i < parts.length; i += 2) {
+          coords.push([parseFloat(parts[i+1]), parseFloat(parts[i])]);
+        }
+        
+        return coords;
+      }
+      return null;
+    } catch (error) {
+      console.error(`Error fetching GPS track for ${subId}:`, error);
+      return null;
+    }
+  }
+
   const fetchTasks = queries.map((query, i) => () => {
     loaderText.textContent = `Fetching checklist locations: ${i + 1} / ${queries.length}`;
     return fetchChecklistBatch(query);
@@ -252,6 +308,31 @@
     loaderText.textContent = `Mapping checklist locations: ${processed} / ${checklistInfo.length}`;
   });
 
+  // NEW: Fetch GPS tracks
+  loaderText.textContent = "Fetching GPS tracks...";
+  const trackColors = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf'];
+  let colorIndex = 0;
+  
+  const trackTasks = checklistInfo.map((info, i) => async () => {
+    loaderText.textContent = `Fetching GPS tracks: ${i + 1} / ${checklistInfo.length}`;
+    const coords = await fetchGPSTrack(info.subId);
+    if (coords && coords.length > 0) {
+      const color = trackColors[colorIndex % trackColors.length];
+      colorIndex++;
+      
+      const polyline = L.polyline(coords, {
+        color: color,
+        weight: 3,
+        opacity: 0.7
+      }).bindPopup(`<b><a href="https://ebird.org/checklist/${info.subId}" target="_blank">Checklist ${info.subId}</a></b><br>Date: ${info.date}`);
+      
+      gpsTrackLayer.addLayer(polyline);
+    }
+    return coords;
+  });
+
+  await throttleRequests(trackTasks, 3); // Lower concurrency for GPS track fetching
+
   document.getElementById("mychecklists-loader")?.remove();
 
   if (locationMap.size === 0) return;
@@ -262,13 +343,15 @@
 
   points.forEach(point => {
     const color = colorScale(point.subIds.length / maxCount);
-    L.circleMarker([point.lat, point.lng], {
+    const marker = L.circleMarker([point.lat, point.lng], {
       radius: 8,
       fillColor: color,
       color: "#333",
       weight: 1,
       fillOpacity: 0.9
-    }).bindPopup(`<b>${point.name}</b><br>Checklists: ${point.subIds.length}`).addTo(map);
+    }).bindPopup(`<b>${point.name}</b><br>Checklists: ${point.subIds.length}`);
+    
+    markerLayer.addLayer(marker);
   });
 
   const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
@@ -315,19 +398,16 @@
 
   for (const { subId, date } of checklistInfo) {
     const details = await fetchChecklistDetails(subId);
-    // console.log("Details:", details);
     if (details?.data?.durationHrs && !isNaN(details.data.durationHrs)) {
       const speciesCount = new Set();
       for (const [key, value] of Object.entries(details.data.obs)) {
-        speciesCount.add(value.speciesCode);  // Use Set to count unique species
+        speciesCount.add(value.speciesCode);
       }
-      // console.log("Species Count:", speciesCount);
       const speciesUniqueCount = speciesCount.size;
       durations.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs), speciesCount: speciesUniqueCount });
       speciesPerDay.push({ date: new Date(date), speciesCount: speciesUniqueCount });
       hoursPerDay.push({ date: new Date(date), hours: parseFloat(details.data.durationHrs) });
 
-      // Update progress bar
       stepCounter++;
       progress = (stepCounter / totalSteps) * 100;
       updateProgressBar(progress);
@@ -339,71 +419,60 @@
   // Grouping the durations and species count by date
   const dateMap = new Map();
   for (const { date, hours, speciesCount } of durations) {
-    const dateString = date.toISOString().split("T")[0];  // e.g. "2025-05-06"
+    const dateString = date.toISOString().split("T")[0];
     
     if (dateMap.has(dateString)) {
       dateMap.set(dateString, {
-        hours: dateMap.get(dateString).hours + hours, // Sum the hours for the same date
-        speciesCount: dateMap.get(dateString).speciesCount + speciesCount // Sum the species counts
+        hours: dateMap.get(dateString).hours + hours,
+        speciesCount: dateMap.get(dateString).speciesCount + speciesCount
       });
     } else {
       dateMap.set(dateString, { hours, speciesCount });
     }
   }
 
-  // Sort by date
   const aggregatedData = Array.from(dateMap.entries()).sort((a, b) => new Date(a[0]) - new Date(b[0]));
 
-  // Preparing the data for plotting
   const labels = [];
   const values = [];
   let cumulativeHours = 0;
   for (const [date, { hours, speciesCount }] of aggregatedData) {
-    cumulativeHours += hours; // Add up the hours cumulatively
-    labels.push(date); // Date string as label
-    values.push(cumulativeHours); // Store cumulative hours
-    // Optionally, store species counts separately or on the same graph
+    cumulativeHours += hours;
+    labels.push(date);
+    values.push(cumulativeHours);
   }
-
-  console.log("Labels:", labels); // Check labels
-  console.log("Values:", values); // Check values
   
-  // Set up SVG dimensions
   const margin = { top: 20, right: 80, bottom: 40, left: 80 };
-  const width = 1000 - margin.left - margin.right; // Start with a wide default, still responsive
+  const width = 1000 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
   
   const svg = d3.select("#durationChart")
     .append("svg")
     .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
     .attr("preserveAspectRatio", "xMidYMid meet")
-    .style("width", "100%")   // Let it scale to the container width
+    .style("width", "100%")
     .style("height", "auto")
     .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);  
+    .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Parse the date
   const parseDate = d3.timeParse("%Y-%m-%d");
   
-  // Set up the scales
   const xOriginal = d3.scaleTime()
-  .domain(d3.extent(labels, d => parseDate(d)))
-  .range([0, width]);
+    .domain(d3.extent(labels, d => parseDate(d)))
+    .range([0, width]);
 
   const x = xOriginal.copy();
   
   const y = d3.scaleLinear()
-    .domain([0, d3.max(values)]) // Y axis range
+    .domain([0, d3.max(values)])
     .nice()
     .range([height, 0]);
   
-  // Add the X axis
   svg.append("g")
     .attr("class", "x-axis")
     .attr("transform", "translate(0," + height + ")")
     .call(d3.axisBottom(x).ticks(d3.timeMonth.every(1)));
   
-  // Add the Y axis
   svg.append("g")
     .attr("class", "y-axis")
     .call(d3.axisLeft(y));
@@ -418,26 +487,23 @@
     .attr("transform", `translate(${width},0)`)
     .call(d3.axisRight(yRight));
   
-  // Line generator
   const line = d3.line()
-    .x(d => x(parseDate(d.date)))  // Date to X position
-    .y(d => y(d.hours)); // Cumulative hours to Y position
+    .x(d => x(parseDate(d.date)))
+    .y(d => y(d.hours));
 
-    const speciesLine = d3.line()
+  const speciesLine = d3.line()
     .x(d => x(parseDate(d.date)))
     .y(d => yRight(d.speciesCount));
   
   const hoursPerDayLine = d3.line()
     .x(d => x(parseDate(d.date)))
-    .y(d => yRight(d.hours));  
+    .y(d => yRight(d.hours));
   
-  // Data for the line
   const data = labels.map((label, index) => ({
     date: label,
     hours: values[index]
   }));
   
-  // Create the line chart
   svg.append("path")
     .data([data])
     .attr("class", "line")
@@ -446,7 +512,6 @@
     .attr("stroke", "#28a745")
     .attr("stroke-width", 2);
   
-  // Add the area under the curve (for filled line chart)
   svg.append("path")
     .data([data])
     .attr("class", "area")
@@ -456,7 +521,7 @@
       .y1(d => y(d.hours)))
     .attr("fill", "rgba(40,167,69,0.2)");
 
-    const tooltip = d3.select("#tooltip");
+  const tooltip = d3.select("#tooltip");
 
   const speciesData = aggregatedData.map(([date, { speciesCount }]) => ({
     date,
@@ -481,11 +546,10 @@
     .attr("class", "hours-per-day-line")
     .attr("d", hoursPerDayLine)
     .attr("fill", "none")
-    .attr("stroke", "#ffc107") // yellow-orange
+    .attr("stroke", "#ffc107")
     .attr("stroke-width", 2)
-    .attr("stroke-dasharray", "4 2"); // optional dashed style for distinction
+    .attr("stroke-dasharray", "4 2");
   
-  // Optional: Add a title and labels to the axes
   svg.append("text")
     .attr("transform", "translate(" + (width / 2) + " ," + (height + margin.bottom - 10) + ")")
     .style("text-anchor", "middle")
@@ -496,7 +560,7 @@
     .attr("y", 0 - (margin.left)/2)
     .attr("x", 0 - (height / 2))
     .style("text-anchor", "middle")
-    .text("Cumulative Hours");  
+    .text("Cumulative Hours");
 
   svg.append("text")
     .attr("transform", `rotate(-90)`)
@@ -521,7 +585,6 @@
     const d1 = data[i];
   
     if (!d0 || !d1) {
-      // focusCircle.style("opacity", 0);
       focusLine.style("opacity", 0);
       tooltip.style("opacity", 0);
       return;
@@ -532,7 +595,6 @@
     const speciesCount = speciesPoint?.[1]?.speciesCount ?? 0;
     const hoursToday = speciesPoint?.[1]?.hours ?? 0;
     const xCoord = x(parseDate(d.date));
-    const yCoord = y(d.hours);
 
     focusLine
       .attr("x1", xCoord)
@@ -549,7 +611,7 @@
       `)
       .style("left", (event.pageX + 20) + "px")
       .style("top", (event.pageY - 20) + "px");
-  } 
+  }
 
   svg.append("rect")
     .attr("width", width)
@@ -594,18 +656,15 @@
     .style("font-size", "12px")
     .attr("alignment-baseline", "middle");
     
-  // Set up the zoom behavior
   const zoom = d3.zoom()
-    .scaleExtent([1, 10]) // Zoom level range (1 is the initial, 10 is the max zoom)
-    .translateExtent([[0, 0], [width, height]]) // Limit the panning area
+    .scaleExtent([1, 10])
+    .translateExtent([[0, 0], [width, height]])
     .on("zoom", zoomed);
 
-  // Zoom function
   function zoomed(event) {
     const transform = event.transform;
-    const newX = transform.rescaleX(x); // Correctly rescale x-axis
+    const newX = transform.rescaleX(x);
   
-    // Update lines with rescaled x
     svg.selectAll(".line")
       .attr("d", d3.line()
         .x(d => newX(parseDate(d.date)))
@@ -633,9 +692,8 @@
   
     svg.select(".x-axis")
       .call(d3.axisBottom(newX).ticks(d3.timeMonth.every(1)));
-  }  
+  }
 
-  // Apply the zoom to the chart
   svg.call(zoom);
   
 })();
