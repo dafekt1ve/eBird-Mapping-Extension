@@ -77,6 +77,23 @@
   container.id = 'ebird-map-container';
   container.style.margin = '2rem 0';
 
+  // Add CSS for tight layer control spacing
+  const style = document.createElement('style');
+  style.textContent = `
+    #ebird-map .leaflet-control-layers label {
+      margin: 0 !important;
+      padding: 0px 5px !important;
+      line-height: 1.2 !important;
+    }
+    #ebird-map .leaflet-control-layers-separator {
+      margin: 2px 0 !important;
+    }
+    #ebird-map .leaflet-control-layers input {
+      margin: 2px 5px 2px 0 !important;
+    }
+  `;
+  document.head.appendChild(style);
+
   const mapDiv = document.createElement('div');
   mapDiv.id = 'ebird-map';
   mapDiv.style.height = '500px';
@@ -100,10 +117,27 @@
 
   function createDaysBackControl(initialDays) {
     return L.Control.extend({
-      options: { position: 'topleft' },
+      options: { position: 'topright' },
       onAdd: function () {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        const select = L.DomUtil.create('select', '', container);
+        const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        wrapper.style.background = 'white';
+
+        // Create toggle button with filter icon
+        const toggleBtn = L.DomUtil.create('button', '', wrapper);
+        toggleBtn.innerHTML = '&#9776;'; // Hamburger/filter icon
+        toggleBtn.style.cssText = 'width: 30px; height: 30px; border: none; background: white; cursor: pointer; font-size: 18px;';
+        toggleBtn.title = 'Toggle filters';
+
+        // Create content container
+        const content = L.DomUtil.create('div', '', wrapper);
+        content.style.cssText = 'display: none; padding: 8px; background: white; border-top: 1px solid #ccc;';
+
+        const label = L.DomUtil.create('label', '', content);
+        label.style.fontWeight = 'bold';
+        label.style.marginRight = '8px';
+        label.textContent = 'Days back:';
+
+        const select = L.DomUtil.create('select', '', content);
         select.id = 'days-filter';
         select.style.all = 'revert';
 
@@ -115,7 +149,20 @@
           select.appendChild(option);
         }
 
-        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableClickPropagation(wrapper);
+
+        // Toggle functionality
+        L.DomEvent.on(toggleBtn, 'click', (e) => {
+          e.stopPropagation();
+          if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggleBtn.style.background = '#f4f4f4';
+          } else {
+            content.style.display = 'none';
+            toggleBtn.style.background = 'white';
+          }
+        });
+
         L.DomEvent.on(select, 'change', () => {
           if (ebirdMapInstance) {
             lastMapView = {
@@ -126,8 +173,7 @@
           renderMap(parseInt(select.value, 10));
         });
 
-
-        return container;
+        return wrapper;
       }
     });
   }
@@ -238,10 +284,12 @@
 
       ebirdMapInstance.addControl(new L.Control.Fullscreen());
 
+      layerControl = L.control.layers(baseMaps).addTo(ebirdMapInstance);
+
       const DaysBackControl = new (createDaysBackControl(daysBack));
       ebirdMapInstance.addControl(DaysBackControl);
 
-      layerControl = L.control.layers(baseMaps).addTo(ebirdMapInstance);
+      L.control.scale({ position: 'bottomleft' }).addTo(ebirdMapInstance);
 
       // Set default layer
       lastBaseLayer = googleStreets;

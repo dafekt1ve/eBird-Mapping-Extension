@@ -20,6 +20,19 @@
       <div id="mychecklists-loader-text">Loading checklist locations...</div>
     </div>
     <div id="mychecklists-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0;"></div>
+    <style>
+      #mychecklists-map .leaflet-control-layers label {
+        margin: 0 !important;
+        padding: 0px 5px !important;
+        line-height: 1.2 !important;
+      }
+      #mychecklists-map .leaflet-control-layers-separator {
+        margin: 2px 0 !important;
+      }
+      #mychecklists-map .leaflet-control-layers input {
+        margin: 2px 5px 2px 0 !important;
+      }
+    </style>
     <div id="loader" style="display: none; text-align: center; margin-top: 20px;">
       <span>Loading...</span>
       <div style="border: 2px solid #ccc; border-radius: 5px; width: 100%; height: 20px; background-color: #f3f3f3;">
@@ -365,6 +378,8 @@
   const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
   map.fitBounds(bounds, { padding: [20, 20] });
   map.addControl(new L.Control.Fullscreen());
+
+  L.control.scale({ position: 'bottomleft' }).addTo(map);
 
   const legend = L.control({ position: "bottomright" });
   legend.onAdd = function () {

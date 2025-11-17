@@ -70,6 +70,17 @@
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
+      .leaflet-control-layers label {
+        margin: 0 !important;
+        padding: 0px 5px !important;
+        line-height: 1.2 !important;
+      }
+      .leaflet-control-layers-separator {
+        margin: 2px 0 !important;
+      }
+      .leaflet-control-layers input {
+        margin: 2px 5px 2px 0 !important;
+      }
     `;
     document.head.appendChild(spinnerStyle);
 
@@ -178,24 +189,58 @@
         mapWrapper.style.gridColumn = "1 / -1";
         mapWrapper.style.marginTop = "15px";
         mapWrapper.style.position = "relative";
-    
+
         const mapContainer = document.createElement("div");
         mapContainer.style.height = "300px";
         mapContainer.style.width = "100%";
         mapContainer.style.border = "1px solid #ccc";
         mapContainer.style.borderRadius = "8px";
-    
+
         mapWrapper.appendChild(mapContainer);
         speciesItem.appendChild(mapWrapper);
-    
-        const map = L.map(mapContainer).setView([40.015, -105.2705], 8);
-    
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '© OpenStreetMap contributors',
-        }).addTo(map);
-    
-        L.control.scale().addTo(map);
+
+        // Define base layers
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const baseMaps = {
+          "Streets": googleStreets,
+          "Hybrid": googleHybrid,
+          "Satellite": googleSat,
+          "Terrain": googleTerrain
+        };
+
+        const map = L.map(mapContainer, {
+          layers: [googleStreets]
+        }).setView([40.015, -105.2705], 8);
+
+        // Add layer control
+        L.control.layers(baseMaps).addTo(map);
+
         map.addControl(new L.Control.Fullscreen());
+
+        L.control.scale({ position: 'bottomleft' }).addTo(map);
 
     
         const colorScale = d3.scaleSequential(d3.interpolateYlOrRd).domain([30, 0]);
@@ -351,64 +396,66 @@
         mapWrapper.id = "targets-all-map-container";
         mapWrapper.style.width = "100%";
         mapWrapper.style.marginTop = "15px";
-        
-        const filterContainer = document.createElement("div");
-        filterContainer.style.margin = "10px 0";
-        filterContainer.style.width = "80%";
-        filterContainer.style.display = "flex";
-
-        const exoticCheckbox = document.createElement("input");
-        exoticCheckbox.type = "checkbox";
-        exoticCheckbox.id = "exotic-toggle";
-        exoticCheckbox.checked = false;
-        exoticCheckbox.style.verticalAlign = "middle";
-        exoticCheckbox.style.margin = "-25px 0px 5px 20px";
-        
-        const exoticLabel = document.createElement("label");
-        exoticLabel.setAttribute("for", "exotic-toggle");
-        exoticLabel.textContent = "Exclude Exotic Species";
-        
-        filterContainer.innerHTML = `
-          <label for="daysBackSelect" style="font-weight:bold; margin-right: 8px">Show observations from last:</label>
-          <select id="daysBackSelect" style="width: 40%">
-            <option value="30">30 days (max)</option>
-            <option value="21">3 weeks</option>
-            <option value="14">2 weeks</option>
-            <option value="7">1 week</option>
-            <option value="5">5 days</option>
-            <option value="3">3 days</option>
-            <option value="1">1 day</option>
-          </select>
-        `;
-
-        filterContainer.appendChild(exoticCheckbox);
-        filterContainer.appendChild(exoticLabel);
-        insertAfterElement.parentNode.insertBefore(filterContainer, insertAfterElement.nextSibling);
 
         const mapContainer = document.createElement("div");
         mapContainer.style.height = "600px";
         mapContainer.style.width = "100%";
         mapContainer.style.border = "1px solid #ccc";
         mapContainer.style.borderRadius = "8px";
-        
+
         mapWrapper.appendChild(mapContainer);
         insertAfterElement.parentNode.insertBefore(mapWrapper, insertAfterElement.nextSibling);
-        
-        const map = L.map(mapContainer).setView([0, 0], 2);
+
+        // Define base layers
+        const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+          maxZoom: 15,
+          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+          attribution: "&copy; Google",
+        });
+
+        const baseMaps = {
+          "Streets": googleStreets,
+          "Hybrid": googleHybrid,
+          "Satellite": googleSat,
+          "Terrain": googleTerrain
+        };
+
+        const map = L.map(mapContainer, {
+          layers: [googleStreets]
+        }).setView([0, 0], 2);
+
+        // Add layer control
+        L.control.layers(baseMaps).addTo(map);
+
+        map.addControl(new L.Control.Fullscreen());
+
+        L.control.scale({ position: 'bottomleft' }).addTo(map);
 
         let userMovedMap = false;
 
         map.on('zoomstart', () => { userMovedMap = true; });
         map.on('dragstart', () => { userMovedMap = true; });
-        
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '© OpenStreetMap contributors',
-        }).addTo(map);
-        
-        L.control.scale().addTo(map);
-        
+
         const sightingsByLocation = {};
-        
+
         for (const key in allData) {
             const sightings = allData[key];
             sightings.forEach(loc => {
@@ -419,15 +466,15 @@
                 sightingsByLocation[keyStr].push(loc);
             });
         }
-        
+
         const locationsArray = Object.entries(sightingsByLocation).map(([key, locs]) => {
             const [lat, lng] = key.split(",").map(Number);
             return { lat, lng, species: locs };
         });
-        
+
         const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
             .domain([1, d3.max(locationsArray, d => d.species.length)]);
-    
+
         function addColorLegend(map, colorScale, minValue, maxValue, label = "Species Count") {
             const legend = L.control({ position: "bottomright" });
             legend.onAdd = function () {
@@ -441,7 +488,7 @@
                 return div;
             };
             legend.addTo(map);
-        
+
             setTimeout(() => {
                 const canvas = document.getElementById(`legend-canvas-${map._leaflet_id}`);
                 if (!canvas) return;
@@ -454,19 +501,90 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }, 100);
         }
-        
+
         locationsArray.sort((a, b) => a.species.length - b.species.length);
-        
-        map.addControl(new L.Control.Fullscreen());
+
         addColorLegend(map, colorScale, locationsArray[0].species.length, locationsArray.at(-1).species.length, "Species Count");
-    
+
         let bounds = L.latLngBounds();
-    
+
         let markers = [];
 
+        // Create filter control
+        const FilterControl = L.Control.extend({
+          options: { position: 'topright' },
+          onAdd: function () {
+            const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            wrapper.style.background = 'white';
+
+            // Create toggle button with filter icon
+            const toggleBtn = L.DomUtil.create('button', '', wrapper);
+            toggleBtn.innerHTML = '&#9776;'; // Hamburger/filter icon
+            toggleBtn.style.cssText = 'width: 30px; height: 30px; border: none; background: white; cursor: pointer; font-size: 18px;';
+            toggleBtn.title = 'Toggle filters';
+
+            // Create content container
+            const content = L.DomUtil.create('div', '', wrapper);
+            content.style.cssText = 'display: none; padding: 8px; background: white; border-top: 1px solid #ccc; white-space: nowrap;';
+
+            const label = L.DomUtil.create('label', '', content);
+            label.style.fontWeight = 'bold';
+            label.style.marginRight = '8px';
+            label.style.display = 'block';
+            label.style.marginBottom = '4px';
+            label.textContent = 'Show observations from last:';
+
+            const select = L.DomUtil.create('select', '', content);
+            select.id = 'daysBackSelect';
+            select.style.all = 'revert';
+            select.style.width = '100%';
+            select.style.marginBottom = '8px';
+            select.innerHTML = `
+              <option value="30">30 days (max)</option>
+              <option value="21">3 weeks</option>
+              <option value="14">2 weeks</option>
+              <option value="7">1 week</option>
+              <option value="5">5 days</option>
+              <option value="3">3 days</option>
+              <option value="1">1 day</option>
+            `;
+
+            const checkboxDiv = L.DomUtil.create('div', '', content);
+            const checkbox = L.DomUtil.create('input', '', checkboxDiv);
+            checkbox.type = 'checkbox';
+            checkbox.id = 'exotic-toggle';
+            checkbox.style.marginRight = '5px';
+
+            const checkboxLabel = L.DomUtil.create('label', '', checkboxDiv);
+            checkboxLabel.setAttribute('for', 'exotic-toggle');
+            checkboxLabel.textContent = 'Exclude Exotic Species';
+
+            L.DomEvent.disableClickPropagation(wrapper);
+
+            // Toggle functionality
+            L.DomEvent.on(toggleBtn, 'click', (e) => {
+              e.stopPropagation();
+              if (content.style.display === 'none') {
+                content.style.display = 'block';
+                toggleBtn.style.background = '#f4f4f4';
+              } else {
+                content.style.display = 'none';
+                toggleBtn.style.background = 'white';
+              }
+            });
+
+            L.DomEvent.on(select, 'change', updateMarkers);
+            L.DomEvent.on(checkbox, 'change', updateMarkers);
+
+            return wrapper;
+          }
+        });
+
+        map.addControl(new FilterControl());
+
         function updateMarkers() {
-          const excludeExotics = exoticCheckbox.checked;
-          const daysBack = parseInt(document.getElementById("daysBackSelect").value, 10);
+          const excludeExotics = document.getElementById('exotic-toggle').checked;
+          const daysBack = parseInt(document.getElementById('daysBackSelect').value, 10);
       
           const cutoffDate = new Date();
           cutoffDate.setDate(cutoffDate.getDate() - daysBack);
@@ -511,11 +629,8 @@
           }
       }
       
-        
+
         updateMarkers();
-    
-        exoticCheckbox.addEventListener("change", updateMarkers);
-        document.getElementById("daysBackSelect").addEventListener("change", updateMarkers);
-    }    
+    }
 
   })();

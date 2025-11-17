@@ -57,19 +57,27 @@
   const existing = document.getElementById("lifelist-map-container");
   if (existing) existing.remove();
 
+  // Get the dynamic heading from the page
+  const pageHeadings = document.querySelectorAll('.Heading.Heading--h1 .Heading-main');
+  const listType = pageHeadings.length >= 2 ? pageHeadings[1].textContent.trim() : 'Life List';
+
   const container = document.createElement("div");
   container.id = "lifelist-map-container";
   container.innerHTML = `
-    <h2>Your Life List Map</h2>
-    <label style="font-weight: bold; margin-right: 8px;">Show birds seen before:</label>
-    <select id="lifelist-year-filter" style="width: 200px; margin: 0 0.5rem;"></select>
-    <button id="lifelist-clear-filter" class="Button Button--pill Button--small Button--hollow" style="padding: 4px 10px; font-size: 0.9em;">Clear</button>
+    <h2>${listType} Map</h2>
     <div id="lifelist-loader" class="lifelist-loader-container">
       <div class="lifelist-spinner"></div>
       <div id="lifelist-loader-text">Collecting lifers...</div>
     </div>
-    <div id="lifelist-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0;"></div>
+    <div id="lifelist-map" style="height: 500px; width: 100%; border: 1px solid #ccc; border-radius: 8px; z-index: 0; display: none;"></div>
     <style>
+      #lifelist-map .leaflet-control-layers label {
+        margin: 2px 0 !important;
+        padding: 1px 5px !important;
+      }
+      #lifelist-map .leaflet-control-layers-separator {
+        margin: 2px 0 !important;
+      }
       .lifelist-loader-container {
         display: flex;
         align-items: center;
@@ -186,21 +194,131 @@
 
   document.getElementById("lifelist-loader")?.remove();
 
-  const map = L.map("lifelist-map").setView([38, -97], 4);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
+  // Show the map now that processing is complete
+  const mapElement = document.getElementById("lifelist-map");
+  if (mapElement) mapElement.style.display = 'block';
+
+  // Define base layers
+  const googleStreets = L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleSat = L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const googleTerrain = L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+    maxZoom: 15,
+    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: "&copy; Google",
+  });
+
+  const baseMaps = {
+    "Streets": googleStreets,
+    "Hybrid": googleHybrid,
+    "Satellite": googleSat,
+    "Terrain": googleTerrain
+  };
+
+  const map = L.map("lifelist-map", {
+    layers: [googleStreets]
+  }).setView([38, -97], 4);
+
+  // Add layer control
+  L.control.layers(baseMaps).addTo(map);
 
   map.addControl(new L.Control.Fullscreen());
 
-  const yearFilter = document.getElementById("lifelist-year-filter");
-  const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
-  sortedYears.forEach(y => {
-    const option = document.createElement("option");
-    option.value = y;
-    option.textContent = y;
-    yearFilter.appendChild(option);
+  L.control.scale({ position: 'bottomleft' }).addTo(map);
+
+  // Create year filter control
+  const YearFilterControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function () {
+      const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      wrapper.style.background = 'white';
+
+      // Create toggle button with filter icon
+      const toggleBtn = L.DomUtil.create('button', '', wrapper);
+      toggleBtn.innerHTML = '&#9776;'; // Hamburger/filter icon
+      toggleBtn.style.cssText = 'width: 30px; height: 30px; border: none; background: white; cursor: pointer; font-size: 18px;';
+      toggleBtn.title = 'Toggle filters';
+
+      // Create content container
+      const content = L.DomUtil.create('div', '', wrapper);
+      content.style.cssText = 'display: none; padding: 8px; background: white; border-top: 1px solid #ccc; white-space: nowrap;';
+
+      const label = L.DomUtil.create('label', '', content);
+      label.style.fontWeight = 'bold';
+      label.style.marginRight = '8px';
+      label.textContent = 'Show birds seen before:';
+
+      const select = L.DomUtil.create('select', '', content);
+      select.id = 'lifelist-year-filter';
+      select.style.all = 'revert';
+      select.style.width = '120px';
+      select.style.marginRight = '8px';
+
+      const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = 'All years';
+      select.appendChild(defaultOption);
+
+      sortedYears.forEach(y => {
+        const option = document.createElement('option');
+        option.value = y;
+        option.textContent = y;
+        select.appendChild(option);
+      });
+
+      const button = L.DomUtil.create('button', '', content);
+      button.id = 'lifelist-clear-filter';
+      button.textContent = 'Clear';
+      button.style.all = 'revert';
+      button.style.padding = '4px 10px';
+      button.style.fontSize = '0.9em';
+      button.style.cursor = 'pointer';
+
+      L.DomEvent.disableClickPropagation(wrapper);
+
+      // Toggle functionality
+      L.DomEvent.on(toggleBtn, 'click', (e) => {
+        e.stopPropagation();
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          toggleBtn.style.background = '#f4f4f4';
+        } else {
+          content.style.display = 'none';
+          toggleBtn.style.background = 'white';
+        }
+      });
+
+      L.DomEvent.on(select, 'change', () => {
+        renderMarkers(parseInt(select.value) || (Math.max(...sortedYears) + 1));
+      });
+      L.DomEvent.on(button, 'click', () => {
+        renderMarkers(Math.max(...sortedYears) + 1);
+        select.value = '';
+      });
+
+      return wrapper;
+    }
   });
+
+  map.addControl(new YearFilterControl());
+
+  const sortedYears = Array.from(yearSet).sort((a, b) => a - b);
 
   const colorScale = d3.scaleSequential(d3.interpolateYlOrRd);
   let currentMarkers = [];
@@ -247,15 +365,6 @@
       map.fitBounds(group.getBounds().pad(0.2));
     }
   };
-
-  yearFilter.addEventListener("change", () => {
-    renderMarkers(parseInt(yearFilter.value));
-  });
-
-  document.getElementById("lifelist-clear-filter").addEventListener("click", () => {
-    renderMarkers(Math.max(...sortedYears) + 1);
-    yearFilter.value = "";
-  });
 
   renderMarkers(Math.max(...sortedYears) + 1);
 

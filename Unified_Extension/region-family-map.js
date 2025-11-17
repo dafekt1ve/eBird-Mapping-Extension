@@ -80,45 +80,12 @@
       #family-map-container {
         margin: 20px 0;
       }
-      #family-controls {
-        display: flex;
-        gap: 15px;
-        align-items: center;
-        padding: 15px;
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px 8px 0 0;
-        flex-wrap: wrap;
+      #family-map .leaflet-control-layers label {
+        margin: 2px 0 !important;
+        padding: 1px 5px !important;
       }
-      #family-controls label {
-        font-weight: 600;
-        color: #495057;
-      }
-      #family-controls select,
-      #family-controls button {
-        padding: 8px 12px;
-        border: 1px solid #ced4da;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      #family-controls select {
-        min-width: 250px;
-        background: white;
-      }
-      #family-controls button {
-        background: #28a745;
-        color: white;
-        font-weight: 600;
-        cursor: pointer;
-        border: none;
-        transition: background 0.2s;
-      }
-      #family-controls button:hover {
-        background: #218838;
-      }
-      #family-controls button:disabled {
-        background: #6c757d;
-        cursor: not-allowed;
+      #family-map .leaflet-control-layers-separator {
+        margin: 2px 0 !important;
       }
       #family-map-loader {
         display: none;
@@ -127,8 +94,7 @@
         padding: 10px 15px;
         background: #fff3cd;
         border: 1px solid #ffc107;
-        border-left: none;
-        border-right: none;
+        border-radius: 8px 8px 0 0;
         font-weight: 600;
         color: #856404;
       }
@@ -148,8 +114,7 @@
         height: 600px;
         width: 100%;
         border: 1px solid #dee2e6;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
+        border-radius: 8px;
         z-index: 0;
       }
       .leaflet-popup-content {
@@ -183,9 +148,9 @@
       }
       .legend-gradient {
         height: 20px;
-        background: linear-gradient(to right, 
-          #ffffd9 0%, #edf8b1 12.5%, #c7e9b4 25%, #7fcdbb 37.5%,
-          #41b6c4 50%, #1d91c0 62.5%, #225ea8 75%, #253494 87.5%, #081d58 100%);
+        background: linear-gradient(to right,
+          #ffffcc 0%, #ffeda0 12.5%, #fed976 25%, #feb24c 37.5%,
+          #fd8d3c 50%, #fc4e2a 62.5%, #e31a1c 75%, #bd0026 87.5%, #800026 100%);
         border: 1px solid #999;
         border-radius: 3px;
       }
@@ -205,35 +170,12 @@
         font-size: 13px;
       }
     </style>
-    
-    <div id="family-controls">
-      <div>
-        <label for="family-selector">Bird Family:</label>
-        <select id="family-selector">
-          <option value="">Loading families...</option>
-        </select>
-      </div>
-      
-      <div>
-        <label for="days-selector">Time Range:</label>
-        <select id="days-selector">
-          <option value="30" selected>Last 30 days</option>
-          <option value="21">Last 3 weeks</option>
-          <option value="14">Last 2 weeks</option>
-          <option value="7">Last 1 week</option>
-          <option value="3">Last 3 days</option>
-          <option value="1">Last 1 day</option>
-        </select>
-      </div>
-      
-      <button id="run-family-map">Show Map</button>
-    </div>
-    
+
     <div id="family-map-loader">
       <div class="family-spinner"></div>
       <span id="loader-text">Loading...</span>
     </div>
-    
+
     <div id="family-map"></div>
   `;
 
@@ -504,23 +446,125 @@
     titleCancel: 'Exit fullscreen'
   }).addTo(map);
 
+  L.control.scale({ position: 'bottomleft' }).addTo(map);
+
   // Track user interaction with map (zoom or pan)
   map._userHasInteracted = false;
-  
+
   map.on('zoomend', function() {
     map._userHasInteracted = true;
   });
-  
+
   map.on('moveend', function() {
     map._userHasInteracted = true;
   });
 
-  // UI elements
-  const familySelector = document.getElementById("family-selector");
-  const daysSelector = document.getElementById("days-selector");
-  const runButton = document.getElementById("run-family-map");
+  // UI elements (will be populated by control)
+  let familySelector = null;
+  let daysSelector = null;
+  let runButton = null;
   const loader = document.getElementById("family-map-loader");
   const loaderText = document.getElementById("loader-text");
+
+  // Create family control (will be populated after taxonomy loads)
+  const FamilyControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function () {
+      const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      wrapper.style.background = 'white';
+
+      // Create toggle button with filter icon
+      const toggleBtn = L.DomUtil.create('button', '', wrapper);
+      toggleBtn.innerHTML = '&#9776;'; // Hamburger/filter icon
+      toggleBtn.style.cssText = 'width: 30px; height: 30px; border: none; background: #f4f4f4; cursor: pointer; font-size: 18px;';
+      toggleBtn.title = 'Toggle filters';
+
+      // Create content container (initially visible)
+      const content = L.DomUtil.create('div', '', wrapper);
+      content.style.cssText = 'display: block; padding: 10px; background: white; border-top: 1px solid #ccc; max-width: 350px;';
+
+      const familyDiv = L.DomUtil.create('div', '', content);
+      familyDiv.style.marginBottom = '8px';
+
+      const familyLabel = L.DomUtil.create('label', '', familyDiv);
+      familyLabel.textContent = 'Bird Family: ';
+      familyLabel.style.fontWeight = 'bold';
+      familyLabel.style.marginRight = '8px';
+      familyLabel.style.display = 'block';
+      familyLabel.style.marginBottom = '4px';
+
+      const familySelect = L.DomUtil.create('select', '', familyDiv);
+      familySelect.id = 'family-selector';
+      familySelect.style.all = 'revert';
+      familySelect.style.width = '100%';
+      familySelect.innerHTML = '<option value="">Loading families...</option>';
+
+      const daysDiv = L.DomUtil.create('div', '', content);
+      daysDiv.style.marginBottom = '8px';
+
+      const daysLabel = L.DomUtil.create('label', '', daysDiv);
+      daysLabel.textContent = 'Time Range: ';
+      daysLabel.style.fontWeight = 'bold';
+      daysLabel.style.marginRight = '8px';
+      daysLabel.style.display = 'block';
+      daysLabel.style.marginBottom = '4px';
+
+      const daysSelect = L.DomUtil.create('select', '', daysDiv);
+      daysSelect.id = 'days-selector';
+      daysSelect.style.all = 'revert';
+      daysSelect.style.width = '100%';
+      daysSelect.innerHTML = `
+        <option value="30" selected>Last 30 days</option>
+        <option value="21">Last 3 weeks</option>
+        <option value="14">Last 2 weeks</option>
+        <option value="7">Last 1 week</option>
+        <option value="3">Last 3 days</option>
+        <option value="1">Last 1 day</option>
+      `;
+
+      const button = L.DomUtil.create('button', '', content);
+      button.id = 'run-family-map';
+      button.textContent = 'Show Map';
+      button.style.all = 'revert';
+      button.style.padding = '8px 16px';
+      button.style.background = '#28a745';
+      button.style.color = 'white';
+      button.style.fontWeight = '600';
+      button.style.cursor = 'pointer';
+      button.style.border = 'none';
+      button.style.borderRadius = '4px';
+      button.style.width = '100%';
+
+      L.DomEvent.disableClickPropagation(wrapper);
+
+      // Toggle functionality
+      L.DomEvent.on(toggleBtn, 'click', (e) => {
+        e.stopPropagation();
+        if (content.style.display === 'none') {
+          content.style.display = 'block';
+          toggleBtn.style.background = '#f4f4f4';
+        } else {
+          content.style.display = 'none';
+          toggleBtn.style.background = 'white';
+        }
+      });
+
+      // Collapse panel when "Show Map" is clicked
+      L.DomEvent.on(button, 'click', () => {
+        content.style.display = 'none';
+        toggleBtn.style.background = 'white';
+      });
+
+      // Store references for later use
+      familySelector = familySelect;
+      daysSelector = daysSelect;
+      runButton = button;
+
+      return wrapper;
+    }
+  });
+
+  map.addControl(new FamilyControl());
 
   // Fetch eBird taxonomy and populate family selector
   let taxonomyData = [];
@@ -598,23 +642,23 @@
   await loadTaxonomy();
   console.log("loadTaxonomy() completed");
 
-  // Color scale function based on species count (YlGnBu palette from matplotlib)
+  // Color scale function based on species count (YlOrRd palette - yellow to orange to red)
   function getColorForCount(count, maxCount) {
-    // YlGnBu: Yellow-Green-Blue gradient
+    // YlOrRd: Yellow-Orange-Red gradient
     // Interpolate based on ratio
     const ratio = Math.min(count / Math.max(maxCount, 1), 1);
-    
-    // YlGnBu color palette (low to high diversity)
+
+    // YlOrRd color palette (low to high diversity)
     const colors = [
-      '#ffffd9', // Very light yellow (1 species)
-      '#edf8b1', // Light yellow-green
-      '#c7e9b4', // Yellow-green
-      '#7fcdbb', // Green-blue
-      '#41b6c4', // Medium blue
-      '#1d91c0', // Blue
-      '#225ea8', // Dark blue
-      '#253494', // Darker blue
-      '#081d58'  // Very dark blue (max species)
+      '#ffffcc', // Very light yellow (1 species)
+      '#ffeda0', // Light yellow
+      '#fed976', // Yellow
+      '#feb24c', // Yellow-orange
+      '#fd8d3c', // Orange
+      '#fc4e2a', // Orange-red
+      '#e31a1c', // Red
+      '#bd0026', // Dark red
+      '#800026'  // Very dark red (max species)
     ];
     
     // Determine which color based on ratio
