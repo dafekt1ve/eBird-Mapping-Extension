@@ -19,7 +19,7 @@
   4. In the file upload pop-up window, find the downloaded folder and open the "manifest.json".
 
 **To Run the Extension**
-  1. Navigate to your eBird Needs Alert pages (Explore > Alerts > select a Needs page), or if you don't have any already loaded, you can still view a page matching your needs alerts.
-  2. Once your selected Needs page fully loads, click on the extensions puzzle piece in the top-right of your web browser.
+  1. Navigate to your eBird Needs Alert, Targets, MyChecklsits, Lifelist, or Region pages.
+  2. Once your selected page fully loads, click on the extensions puzzle piece in the top-right of your web browser.
   3. If using Firefox, you may need to click again on the Extension to run it.
-  4. This should add the map to your Needs page.
+  4. This should add the map to your page of choice.
