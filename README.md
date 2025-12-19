@@ -1,4 +1,4 @@
-**Download the full package.**
+**Download the full package by clicking the "Code" button in the top right and downloading the Zip file.**
 
 **Chrome Installation instructions**
 
