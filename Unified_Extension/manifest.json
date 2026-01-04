@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "eBird Sightings Mapper",
-  "version": "1.1",
-  "description": "Displays a Leaflet map of eBird sightings colored by species count.",
+  "version": "1.2",
+  "description": "Displays a Leaflet map of eBird sightings colored by species count. Now includes media pages!",
   "permissions": [
     "scripting",
     "activeTab",
@@ -15,6 +15,7 @@
     "https://ebird.org/mychecklists*",
     "https://ebird.org/targets*",
     "https://ebird.org/region/*",
+    "https://media.ebird.org/*",
     "http://localhost:8000/*"
   ],
   "action": {
@@ -24,8 +25,7 @@
     }
   },
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
   "web_accessible_resources": [
     {
@@ -42,10 +42,11 @@
         "mychecklists-map.js",
         "targets-map.js",
         "region-family-map.js",
+        "media-map.js",
         "regionLookup/regionLookup-expanded.json",
         "ebird-taxonomy.json"
       ],
-      "matches": ["https://ebird.org/*"]
+      "matches": ["https://ebird.org/*", "https://media.ebird.org/*"]
     }
   ],
   "icons": {

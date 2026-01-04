@@ -11,8 +11,11 @@ browserAPI.action.onClicked.addListener((tab) => {
   const isMyChecklistsPage = tab.url.startsWith("https://ebird.org/mychecklists");
   const isTargetsPage = tab.url.startsWith("https://ebird.org/targets");
   const isRegionPage = tab.url.startsWith("https://ebird.org/region/");
+  
+  // New: Detect media pages on media.ebird.org
+  const isMediaPage = tab.url.startsWith("https://media.ebird.org/catalog");
 
-  if (isAlertPage || isLifeListPage || isMyChecklistsPage || isTargetsPage || isRegionPage) {
+  if (isAlertPage || isLifeListPage || isMyChecklistsPage || isTargetsPage || isRegionPage || isMediaPage) {
     // Inject CSS and JavaScript files
     browserAPI.scripting.insertCSS({
       target: { tabId: tab.id },
@@ -61,6 +64,9 @@ browserAPI.action.onClicked.addListener((tab) => {
       scriptToInject = "targets-map.js";
     } else if (isRegionPage) {
       scriptToInject = "region-family-map.js";
+    } else if (isMediaPage) {
+      // New: Inject media map script
+      scriptToInject = "media-map.js";
     }
 
     browserAPI.scripting.executeScript({
@@ -68,12 +74,12 @@ browserAPI.action.onClicked.addListener((tab) => {
       files: [scriptToInject]
     });
   } else {
-    console.log("This extension only works on eBird alert, lifelist, targets, MyChecklists, or checklist pages.");
+    console.log("This extension only works on eBird alert, lifelist, targets, MyChecklists, media, or checklist pages.");
     browserAPI.notifications.create("Error", {
       type: "basic",
       iconUrl: "icon.png",
       title: 'Warning',
-      message: 'This extension only works on eBird alert, lifelist, targets, MyChecklists, or checklist pages.'
+      message: 'This extension only works on eBird alert, lifelist, targets, MyChecklists, media, or checklist pages.'
     });
     browserAPI.notifications.clear("Error");
   }
