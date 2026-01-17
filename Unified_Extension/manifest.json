@@ -15,8 +15,7 @@
     "https://ebird.org/mychecklists*",
     "https://ebird.org/targets*",
     "https://ebird.org/region/*",
-    "https://media.ebird.org/*",
-    "http://localhost:8000/*"
+    "https://media.ebird.org/*"
   ],
   "action": {
     "default_title": "Map Sightings",
@@ -25,7 +24,7 @@
     }
   },
   "background": {
-    "service_worker": "background.js"
+    "script": ["background.js"]
   },
   "web_accessible_resources": [
     {
